@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -31,14 +31,14 @@ jobs:
 
       # Windows needs the vendored WCAN driver library (same approach as AgIsoVirtualTerminal).
       - name: Checkout AgIsoStack++
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ef12/AgIsoStack-plus-plus
           ref: ${{ env.CAN_STACK_REF }}
           path: _dependencies/AgIsoStack-plus-plus
 
       - name: Checkout SIL
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ef12/SIL
           ref: ${{ env.SIL_REF }}
