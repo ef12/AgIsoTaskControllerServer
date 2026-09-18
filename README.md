@@ -48,6 +48,39 @@ cmake -S . -B build -DAGISOTC_BUILD_GUI=OFF
 cmake --build build --parallel
 ```
 
+### Windows: WCAN driver library (one-time setup)
+
+On Windows the stack always enables its WCAN shared-memory CAN driver, whose
+prebuilt library is generated from the SIL repository. Do this once (PowerShell,
+from the repo root):
+
+```powershell
+git clone https://github.com/ef12/AgIsoStack-plus-plus.git _dependencies/AgIsoStack-plus-plus
+git -C _dependencies/AgIsoStack-plus-plus checkout 1eb0a89f21e0c2ea57a2c63b93a7d3b2218bc66f
+git clone https://github.com/ef12/SIL.git _dependencies/SIL
+git -C _dependencies/SIL checkout d8a869322c7a782bb197662deff67045dc353c7c
+$vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/vswhere.exe"
+$vsInstall = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1).Trim()
+$env:WCAN_VCVARS = Join-Path $vsInstall "VC/Auxiliary/Build/vcvars64.bat"
+./_dependencies/AgIsoStack-plus-plus/tools/sync_wcan.ps1 -Source ./_dependencies/SIL
+```
+
+Then always configure with the source-dir overrides (use a fresh `build` dir if a
+previous configure failed half-way):
+
+```powershell
+Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
+$stackSource = (Resolve-Path ./_dependencies/AgIsoStack-plus-plus).Path.Replace('\', '/')
+$silSource = (Resolve-Path ./_dependencies/SIL).Path.Replace('\', '/')
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release `
+  "-DFETCHCONTENT_SOURCE_DIR_CAN_STACK=$stackSource" `
+  "-DFETCHCONTENT_SOURCE_DIR_SIL=$silSource"
+cmake --build build --config Release --parallel
+```
+
+This needs Visual Studio 2022 with C++ tools, and Qt 6.5+ installed locally for
+the GUI (`-DAGISOTC_BUILD_GUI=OFF` skips the Qt requirement).
+
 ## Usage
 
 1. Pick a driver: `virtual` + a bus name (e.g. `TC-Server`) works with no hardware —
