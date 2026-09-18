@@ -1,0 +1,96 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CAN_STACK_REF: 1eb0a89f21e0c2ea57a2c63b93a7d3b2218bc66f
+  SIL_REF: d8a869322c7a782bb197662deff67045dc353c7c
+  QT_VERSION: '6.5.3'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libgl1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb-cursor-dev
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+
+      # Windows needs the vendored WCAN driver library (same approach as AgIsoVirtualTerminal).
+      - name: Checkout AgIsoStack++
+        if: runner.os == 'Windows'
+        uses: actions/checkout@v4
+        with:
+          repository: ef12/AgIsoStack-plus-plus
+          ref: ${{ env.CAN_STACK_REF }}
+          path: _dependencies/AgIsoStack-plus-plus
+
+      - name: Checkout SIL
+        if: runner.os == 'Windows'
+        uses: actions/checkout@v4
+        with:
+          repository: ef12/SIL
+          ref: ${{ env.SIL_REF }}
+          path: _dependencies/SIL
+
+      - name: Build WCAN dependency
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Add-Content -LiteralPath .git/info/exclude -Value "/_dependencies/"
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/vswhere.exe"
+          $vsInstall = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1).Trim()
+          if ([string]::IsNullOrWhiteSpace($vsInstall)) {
+            throw "Visual Studio C++ build tools were not found."
+          }
+          $env:WCAN_VCVARS = Join-Path $vsInstall "VC/Auxiliary/Build/vcvars64.bat"
+          & ./_dependencies/AgIsoStack-plus-plus/tools/sync_wcan.ps1 -Source ./_dependencies/SIL
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          $wcanLibrary = "./_dependencies/AgIsoStack-plus-plus/hardware_integration/lib/Windows/wcan_x64.lib"
+          if (-not (Test-Path -LiteralPath $wcanLibrary)) {
+            throw "WCAN library was not produced: $wcanLibrary"
+          }
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $stackSource = (Resolve-Path ./_dependencies/AgIsoStack-plus-plus).Path.Replace('\', '/')
+          $silSource = (Resolve-Path ./_dependencies/SIL).Path.Replace('\', '/')
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release `
+            "-DFETCHCONTENT_SOURCE_DIR_CAN_STACK=$stackSource" `
+            "-DFETCHCONTENT_SOURCE_DIR_SIL=$silSource"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Configure (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
