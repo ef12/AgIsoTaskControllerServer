@@ -119,6 +119,7 @@ if(WIN32 AND AGISOTC_BUILD_GUI)
       COMMAND ${WINDEPLOYQT_EXECUTABLE}
         --release
         --quick
+        --qmldir ${CMAKE_CURRENT_SOURCE_DIR}/qml
         --compiler-runtime
         --no-translations
         --no-opengl-sw
