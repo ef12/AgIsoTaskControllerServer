@@ -60,13 +60,9 @@ if(AGISOTC_BUILD_GUI)
     endif()
   endif()
 
-  # Install the executable and QML resources
+  # Install the executable
   install(TARGETS AgIsoTaskControllerServer
     RUNTIME DESTINATION bin
-    COMPONENT applications)
-  install(FILES qml/Main.qml qml/TopBar.qml qml/ClientsPanel.qml qml/DdopPanel.qml
-    qml/ProcessDataPanel.qml qml/CommandPanel.qml qml/SectionView3D.qml qml/LogPanel.qml
-    DESTINATION qml
     COMPONENT applications)
 endif()
 
@@ -128,37 +124,34 @@ if(WIN32 AND AGISOTC_BUILD_GUI)
         --no-opengl-sw
         $<TARGET_FILE_DIR:AgIsoTaskControllerServer>
       COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/stage
-      COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/stage/bin
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/stage
       COMMAND ${CMAKE_COMMAND} -E copy_directory
         $<TARGET_FILE_DIR:AgIsoTaskControllerServer>
-        ${CMAKE_CURRENT_BINARY_DIR}/stage/bin
-      COMMENT "Running windeployqt and staging Qt dependencies"
+        ${CMAKE_CURRENT_BINARY_DIR}/stage
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/Main.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/TopBar.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/ClientsPanel.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/DdopPanel.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/ProcessDataPanel.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/CommandPanel.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/SectionView3D.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/LogPanel.qml
+        ${CMAKE_CURRENT_BINARY_DIR}/stage
+      COMMENT "Running windeployqt, staging Qt deps, and copying QML files"
       VERBATIM)
   endif()
 endif()
 
-# Install the executable, QML files, and staged Qt dependencies
+# Install from staging directory
 if(WIN32 AND AGISOTC_BUILD_GUI)
-  # Install the staged Qt dependencies (executable, DLLs, plugins, QML)
-  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage/bin/
+  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/qt.conf
     DESTINATION bin
     COMPONENT applications
-    FILES_MATCHING PATTERN "*.dll" PATTERN "*.exe"
   )
-  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage/bin/tls
+  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage/
     DESTINATION bin
     COMPONENT applications
-    FILES_MATCHING PATTERN "*.dll"
-  )
-  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage/bin/generic
-    DESTINATION bin
-    COMPONENT applications
-    FILES_MATCHING PATTERN "*.dll"
-  )
-  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage/bin/qml
-    DESTINATION qml
-    COMPONENT applications
-    FILES_MATCHING PATTERN "*.dll" PATTERN "*.qml"
   )
 endif()
 
