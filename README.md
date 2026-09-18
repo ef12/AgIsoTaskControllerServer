@@ -20,7 +20,8 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
 - Task start/stop (task-totals-active status bit)
 - 3D section-control view: section boxes light up from a configurable section-state DDI
 - Event log console, TC identify banner
-- CAN drivers: virtual CAN bus (works everywhere, no hardware) and SocketCAN (Linux)
+- CAN drivers: WCAN shared-memory bus (Windows, cross-process), PCAN-USB
+  (Windows), process-local virtual CAN (tests), and SocketCAN (Linux)
 
 ## Protocol notes
 
@@ -32,8 +33,9 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
 
 ## Build
 
-Requires CMake 3.21+, a C++17 compiler, and Qt 6.5+ (`Core`, `Quick`, `Quick3D`, `Qml`).
-CI builds Windows / Linux / macOS automatically.
+Requires CMake 3.21+, a C++17 compiler, and Qt 6.5+ (`Core`, `Quick`,
+`Quick3D`, `QuickTimeline`, `ShaderTools`, and `Qml`). CI builds Windows /
+Linux / macOS automatically.
 
 ```bash
 git clone https://github.com/ef12/AgIsoTaskControllerServer.git
@@ -83,9 +85,11 @@ the GUI (`-DAGISOTC_BUILD_GUI=OFF` skips the Qt requirement).
 
 ## Usage
 
-1. Pick a driver: `virtual` + a bus name (e.g. `TC-Server`) works with no hardware —
-   run an implement simulator on the same virtual bus name to see clients appear.
-   On Linux with real hardware, use `socketcan` + interface (e.g. `can0`).
+1. Pick a driver. On Windows, `wcan` plus a shared bus name (for example
+   `big_planter_isobus`) connects separate applications without CAN hardware;
+   every application must use the same bus name. Use `pcan_usb` for PEAK
+   PCAN-USB channel 1. The `virtual` driver is useful only for participants in
+   the same process. On Linux, use `socketcan` plus an interface such as `can0`.
 2. Set TC number, booms, sections, channels; press **Start server**.
 3. Select a client, inspect its DDOP, watch live values, send commands.
 

@@ -40,29 +40,29 @@ namespace agisotc
 			else if (auto *element = dynamic_cast<const DeviceElementObject *>(&object))
 			{
 				std::snprintf(buffer, sizeof(buffer), "Element %u (#%u, parent %u): %s",
-				               object.get_object_id(), element->get_element_number(),
-				               element->get_parent_object(), object.get_designator().c_str());
+				              object.get_object_id(), element->get_element_number(),
+				              element->get_parent_object(), object.get_designator().c_str());
 			}
 			else if (auto *processData = dynamic_cast<const DeviceProcessDataObject *>(&object))
 			{
 				std::snprintf(buffer, sizeof(buffer), "Process data %u: DDI %u, triggers 0x%02X: %s",
-				               object.get_object_id(), processData->get_ddi(),
-				               processData->get_trigger_methods_bitfield(), object.get_designator().c_str());
+				              object.get_object_id(), processData->get_ddi(),
+				              processData->get_trigger_methods_bitfield(), object.get_designator().c_str());
 			}
 			else if (auto *property = dynamic_cast<const DevicePropertyObject *>(&object))
 			{
 				std::snprintf(buffer, sizeof(buffer), "Property %u: DDI %u: %s",
-				               object.get_object_id(), property->get_ddi(), object.get_designator().c_str());
+				              object.get_object_id(), property->get_ddi(), object.get_designator().c_str());
 			}
 			else if (nullptr != dynamic_cast<const DeviceValuePresentationObject *>(&object))
 			{
 				std::snprintf(buffer, sizeof(buffer), "Value presentation %u: %s",
-				               object.get_object_id(), object.get_designator().c_str());
+				              object.get_object_id(), object.get_designator().c_str());
 			}
 			else
 			{
 				std::snprintf(buffer, sizeof(buffer), "Object %u: %s",
-				               object.get_object_id(), object.get_designator().c_str());
+				              object.get_object_id(), object.get_designator().c_str());
 			}
 			return QString::fromUtf8(buffer);
 		}
@@ -472,7 +472,32 @@ namespace agisotc
 			setStatus("Select a client first.");
 			return;
 		}
-		const bool sent = server->send_measurement_command(client, static_cast<std::uint8_t>(kind), static_cast<std::uint16_t>(ddi), static_cast<std::uint16_t>(element), static_cast<std::uint32_t>(value));
+		const auto dataDescriptionIndex = static_cast<std::uint16_t>(ddi);
+		const auto elementNumber = static_cast<std::uint16_t>(element);
+		const auto commandValue = static_cast<std::uint32_t>(value);
+		bool sent = false;
+		using ProcessDataCommand = isobus::TaskControllerServer::ProcessDataCommands;
+		switch (static_cast<ProcessDataCommand>(kind))
+		{
+			case ProcessDataCommand::MeasurementTimeInterval:
+				sent = server->send_time_interval_measurement_command(client, dataDescriptionIndex, elementNumber, commandValue);
+				break;
+			case ProcessDataCommand::MeasurementDistanceInterval:
+				sent = server->send_distance_interval_measurement_command(client, dataDescriptionIndex, elementNumber, commandValue);
+				break;
+			case ProcessDataCommand::MeasurementMinimumWithinThreshold:
+				sent = server->send_minimum_threshold_measurement_command(client, dataDescriptionIndex, elementNumber, commandValue);
+				break;
+			case ProcessDataCommand::MeasurementMaximumWithinThreshold:
+				sent = server->send_maximum_threshold_measurement_command(client, dataDescriptionIndex, elementNumber, commandValue);
+				break;
+			case ProcessDataCommand::MeasurementChangeThreshold:
+				sent = server->send_change_threshold_measurement_command(client, dataDescriptionIndex, elementNumber, commandValue);
+				break;
+			default:
+				setStatus("Unknown measurement command.");
+				return;
+		}
 		logs.addLine(QString("[cmd] Measurement command %1 DDI %2 element %3 = %4 -> %5.").arg(kind).arg(ddi).arg(element).arg(value).arg(sent ? "sent" : "FAILED"));
 	}
 

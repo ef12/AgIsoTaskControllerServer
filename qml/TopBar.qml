@@ -11,7 +11,7 @@ RowLayout {
     }
     ComboBox {
         id: driverBox
-        model: ["virtual", "socketcan"]
+        model: ["wcan", "pcan_usb", "virtual", "socketcan"]
         enabled: !bridge.running
         Layout.preferredWidth: 130
     }
@@ -21,7 +21,7 @@ RowLayout {
     }
     TextField {
         id: channelField
-        text: "TC-Server"
+        text: "big_planter_isobus"
         enabled: !bridge.running
         Layout.preferredWidth: 130
     }
@@ -80,9 +80,7 @@ RowLayout {
             if (bridge.running) {
                 bridge.stopServer();
             } else {
-                bridge.startServer(driverBox.currentText, channelField.text,
-                                   tcSpin.value, boomSpin.value,
-                                   sectionSpin.value, channelSpin.value);
+                bridge.startServer(driverBox.currentText, channelField.text, tcSpin.value, boomSpin.value, sectionSpin.value, channelSpin.value);
             }
         }
     }

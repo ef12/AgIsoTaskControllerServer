@@ -35,6 +35,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
+          modules: 'qtshadertools qtquick3d qtquicktimeline'
           cache: true
 
       # Windows needs the vendored WCAN driver library (same approach as AgIsoVirtualTerminal).

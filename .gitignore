@@ -1,5 +1,7 @@
 build/
+build-*/
 cmake-build-*/
+_dependencies/
 *.user
 .vs/
 out/

@@ -6,6 +6,10 @@
 #include "isobus/isobus/can_network_manager.hpp"
 #include "isobus/isobus/isobus_preferred_addresses.hpp"
 
+#ifdef ISOBUS_WCAN_AVAILABLE
+#include "isobus/hardware_integration/wcan_plugin.hpp"
+#endif
+
 namespace agisotc
 {
 	CanBusManager::~CanBusManager()
@@ -27,7 +31,27 @@ namespace agisotc
 			return false;
 		}
 
-		if ("socketcan" == settings.driver)
+		if ("wcan" == settings.driver)
+		{
+#if defined(ISOBUS_WCAN_AVAILABLE)
+			driver = std::make_shared<isobus::WCANPlugin>(settings.channel);
+			driverName = "WCAN (" + settings.channel + ")";
+#else
+			error = "WCAN driver is not available in this build.";
+			return false;
+#endif
+		}
+		else if ("pcan_usb" == settings.driver)
+		{
+#if defined(ISOBUS_WINDOWSPCANBASIC_AVAILABLE)
+			driver = std::make_shared<isobus::PCANBasicWindowsPlugin>(PCAN_USBBUS1);
+			driverName = "PEAK PCAN-USB channel 1";
+#else
+			error = "PEAK PCAN-USB driver is not available in this build.";
+			return false;
+#endif
+		}
+		else if ("socketcan" == settings.driver)
 		{
 #if defined(ISOBUS_SOCKETCAN_AVAILABLE)
 			driver = std::make_shared<isobus::SocketCANInterface>(settings.channel);
