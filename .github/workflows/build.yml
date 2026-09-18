@@ -15,32 +15,22 @@ env:
   QT_VERSION: '6.5.3'
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libgl1-mesa-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb-cursor-dev
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
-          modules: 'qtshadertools qtquick3d qtquicktimeline'
           cache: true
+          modules: 'qtshadertools qtquick3d qtquicktimeline'
 
       # Windows needs the vendored WCAN driver library (same approach as AgIsoVirtualTerminal).
       - name: Checkout AgIsoStack++
-        if: runner.os == 'Windows'
         uses: actions/checkout@v4
         with:
           repository: ef12/AgIsoStack-plus-plus
@@ -48,7 +38,6 @@ jobs:
           path: _dependencies/AgIsoStack-plus-plus
 
       - name: Checkout SIL
-        if: runner.os == 'Windows'
         uses: actions/checkout@v4
         with:
           repository: ef12/SIL
@@ -56,7 +45,6 @@ jobs:
           path: _dependencies/SIL
 
       - name: Build WCAN dependency
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -76,8 +64,7 @@ jobs:
             throw "WCAN library was not produced: $wcanLibrary"
           }
 
-      - name: Configure (Windows)
-        if: runner.os == 'Windows'
+      - name: Configure CMake
         shell: pwsh
         run: |
           $stackSource = (Resolve-Path ./_dependencies/AgIsoStack-plus-plus).Path.Replace('\', '/')
@@ -89,9 +76,5 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Configure (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
+      - name: Build Release
         run: cmake --build build --config Release --parallel
