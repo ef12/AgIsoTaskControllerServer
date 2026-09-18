@@ -17,11 +17,13 @@ FetchContent_Declare(
   GIT_TAG 1eb0a89f21e0c2ea57a2c63b93a7d3b2218bc66f)
 FetchContent_MakeAvailable(CAN_STACK)
 
-# Core library: TC server wrapper + CAN setup. No Qt dependency, so it can be
-# built and unit-tested anywhere the stack builds.
+# Core library: TC server wrapper + CAN setup + GPS + Field/Task. No Qt dependency.
 add_library(tcserver_core STATIC
   src/core/TcServerCore.cpp
-  src/core/CanBusManager.cpp)
+  src/core/CanBusManager.cpp
+  src/core/GpsProvider.cpp
+  src/core/NmeaParser.cpp
+  src/core/IsoGpsHandler.cpp)
 target_include_directories(tcserver_core PUBLIC src/core)
 target_link_libraries(tcserver_core
   PUBLIC
@@ -109,4 +111,55 @@ set(CPACK_COMPONENT_DEFAULT_INSTALL_TYPES "")
 # Only install the application target and QML files - not the transitive stack dependencies
 set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT applications)
 include(InstallRequiredSystemLibraries)
+
+# On Windows, run windeployqt to gather Qt DLLs/plugins/QML imports into a staging directory
+if(WIN32 AND AGISOTC_BUILD_GUI)
+  find_program(WINDEPLOYQT_EXECUTABLE windeployqt
+    PATHS "$ENV{QT_ROOT}/bin" "$ENV{QT_DIR}/bin" "C:/Qt/6.5.3/msvc2019_64/bin"
+    NO_DEFAULT_PATH)
+  if(WINDEPLOYQT_EXECUTABLE)
+    # Run windeployqt and copy Qt dependencies to a staging directory
+    add_custom_command(TARGET AgIsoTaskControllerServer POST_BUILD
+      COMMAND ${WINDEPLOYQT_EXECUTABLE}
+        --release
+        --quick
+        --compiler-runtime
+        --no-translations
+        --no-opengl-sw
+        $<TARGET_FILE_DIR:AgIsoTaskControllerServer>
+      COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/stage
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/stage/bin
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        $<TARGET_FILE_DIR:AgIsoTaskControllerServer>
+        ${CMAKE_CURRENT_BINARY_DIR}/stage/bin
+      COMMENT "Running windeployqt and staging Qt dependencies"
+      VERBATIM)
+  endif()
+endif()
+
+# Install the executable, QML files, and staged Qt dependencies
+if(WIN32 AND AGISOTC_BUILD_GUI)
+  # Install the staged Qt dependencies (executable, DLLs, plugins, QML)
+  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage/bin/
+    DESTINATION bin
+    COMPONENT applications
+    FILES_MATCHING PATTERN "*.dll" PATTERN "*.exe"
+  )
+  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage/bin/tls
+    DESTINATION bin
+    COMPONENT applications
+    FILES_MATCHING PATTERN "*.dll"
+  )
+  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage/bin/generic
+    DESTINATION bin
+    COMPONENT applications
+    FILES_MATCHING PATTERN "*.dll"
+  )
+  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage/bin/qml
+    DESTINATION qml
+    COMPONENT applications
+    FILES_MATCHING PATTERN "*.dll" PATTERN "*.qml"
+  )
+endif()
+
 include(CPack)
