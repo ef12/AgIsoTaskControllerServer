@@ -86,7 +86,7 @@ RowLayout {
     }
     Button {
         text: bridge.taskActive ? "Stop task" : "Start task"
-        enabled: bridge.running
+        enabled: bridge.selectedTaskIndex >= 0
         onClicked: bridge.setTaskActive(!bridge.taskActive)
     }
     Item {

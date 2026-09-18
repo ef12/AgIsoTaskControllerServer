@@ -14,6 +14,9 @@
 #endif
 
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #else
 #include <fcntl.h>
@@ -25,26 +28,22 @@ namespace agisotc
 {
 	namespace
 	{
-		void simulate_solution(GpsSolution &sol, std::uint64_t nowMs)
+		constexpr double EarthRadiusM = 6371000.0;
+		constexpr double DegreesToRadians = M_PI / 180.0;
+		constexpr double RadiansToDegrees = 180.0 / M_PI;
+
+		void move_solution(GpsSolution &solution, double distanceM)
 		{
-			static double phase = 0.0;
-			const double centerLat = 52.0;
-			const double centerLon = 5.0;
-			const double radiusDeg = 0.001;
-			const double periodMs = 120000.0;
-
-			phase = std::fmod(static_cast<double>(nowMs) / periodMs * 2.0 * M_PI, 2.0 * M_PI);
-
-			sol.timestampMs = nowMs;
-			sol.latitudeDeg = centerLat + radiusDeg * std::cos(phase);
-			sol.longitudeDeg = centerLon + radiusDeg * std::sin(phase);
-			sol.altitudeM = 10.0;
-			sol.speedMps = 2.0;
-			sol.courseDeg = std::fmod(phase * 180.0 / M_PI + 90.0, 360.0);
-			sol.fixQuality = FixQuality::GpsFix;
-			sol.satellites = 8;
-			sol.hdop = 1.2;
-			sol.valid = true;
+			if (!solution.latitudeDeg || !solution.longitudeDeg || !solution.courseDeg)
+			{
+				return;
+			}
+			const double headingRad = *solution.courseDeg * DegreesToRadians;
+			const double latitudeRad = *solution.latitudeDeg * DegreesToRadians;
+			*solution.latitudeDeg += (distanceM * std::cos(headingRad) / EarthRadiusM) * RadiansToDegrees;
+			const double longitudeScale = std::max(0.01, std::cos(latitudeRad));
+			*solution.longitudeDeg += (distanceM * std::sin(headingRad) /
+			                           (EarthRadiusM * longitudeScale)) * RadiansToDegrees;
 		}
 	} // namespace
 
@@ -69,6 +68,12 @@ namespace agisotc
 
 		serialPort = serialPort_;
 		baudRate = baudRate_;
+		if (source == GpsSource::Simulated)
+		{
+			simulate = true;
+			running = true;
+			return true;
+		}
 
 		if (source == GpsSource::NmeaOnly || source == GpsSource::Auto)
 		{
@@ -87,6 +92,7 @@ namespace agisotc
 		{
 			std::lock_guard<std::mutex> lock(mutex);
 			running = false;
+			simulate = false;
 		}
 		if (serialThread.joinable())
 			serialThread.join();
@@ -108,7 +114,25 @@ namespace agisotc
 			auto nowMs = static_cast<std::uint64_t>(
 				std::chrono::duration_cast<std::chrono::milliseconds>(
 					std::chrono::steady_clock::now().time_since_epoch()).count());
-			simulate_solution(fused, nowMs);
+			if (!fused.valid)
+			{
+				fused.latitudeDeg = 52.0;
+				fused.longitudeDeg = 5.0;
+				fused.altitudeM = 10.0;
+				fused.speedMps = 0.0;
+				fused.courseDeg = 0.0;
+			}
+			if (0 != lastSimulationUpdateMs)
+			{
+				const double elapsedSeconds = std::min(1.0, static_cast<double>(nowMs - lastSimulationUpdateMs) / 1000.0);
+				move_solution(fused, fused.speedMps.value_or(0.0) * elapsedSeconds);
+			}
+			lastSimulationUpdateMs = nowMs;
+			fused.timestampMs = nowMs;
+			fused.fixQuality = FixQuality::Simulation;
+			fused.satellites = 12;
+			fused.hdop = 0.8;
+			fused.valid = true;
 			if (solutionCb)
 				solutionCb(fused);
 		}
@@ -116,6 +140,7 @@ namespace agisotc
 
 	void GpsProvider::feed_can_message(std::uint32_t pgn, const std::uint8_t *data, std::uint8_t len)
 	{
+		std::lock_guard<std::mutex> lock(mutex);
 		if (source == GpsSource::IsoOnly || source == GpsSource::Auto)
 		{
 			if (iso.process_message(pgn, data, len))
@@ -127,6 +152,7 @@ namespace agisotc
 
 	void GpsProvider::feed_nmea_text(std::string_view text)
 	{
+		std::lock_guard<std::mutex> lock(mutex);
 		if (source == GpsSource::NmeaOnly || source == GpsSource::Auto)
 		{
 			std::size_t start = 0;
@@ -153,7 +179,46 @@ namespace agisotc
 		std::lock_guard<std::mutex> lock(mutex);
 		simulate = enabled;
 		if (enabled)
+		{
 			running = true;
+			lastSimulationUpdateMs = 0;
+		}
+	}
+
+	void GpsProvider::configure_simulation(double latitudeDeg, double longitudeDeg,
+	                                      double speedMps, double courseDeg)
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		source = GpsSource::Simulated;
+		simulate = true;
+		running = true;
+		fused.latitudeDeg = std::clamp(latitudeDeg, -90.0, 90.0);
+		fused.longitudeDeg = std::clamp(longitudeDeg, -180.0, 180.0);
+		fused.altitudeM = 10.0;
+		fused.speedMps = std::max(0.0, speedMps);
+		fused.courseDeg = std::fmod(courseDeg + 360.0, 360.0);
+		fused.fixQuality = FixQuality::Simulation;
+		fused.satellites = 12;
+		fused.hdop = 0.8;
+		fused.valid = true;
+		lastSimulationUpdateMs = 0;
+	}
+
+	void GpsProvider::set_simulation_motion(double speedMps, double courseDeg)
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		fused.speedMps = std::max(0.0, speedMps);
+		fused.courseDeg = std::fmod(courseDeg + 360.0, 360.0);
+	}
+
+	void GpsProvider::nudge_simulation(double forwardMeters, double turnDegrees)
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		const double currentCourse = fused.courseDeg.value_or(0.0);
+		fused.courseDeg = std::fmod(currentCourse + turnDegrees + 360.0, 360.0);
+		move_solution(fused, forwardMeters);
+		fused.valid = fused.latitudeDeg && fused.longitudeDeg;
+		lastSimulationUpdateMs = 0;
 	}
 
 	GpsSolution GpsProvider::current_solution() const
@@ -235,10 +300,16 @@ namespace agisotc
 					if (!line.empty() && line.back() == '\r')
 						line.pop_back();
 					if (!line.empty())
+					{
+						std::lock_guard<std::mutex> lock(mutex);
 						nmea.parse_sentence(line);
+					}
 					lineBuffer.erase(0, pos + 1);
 				}
-				fuse_solutions();
+				{
+					std::lock_guard<std::mutex> lock(mutex);
+					fuse_solutions();
+				}
 			}
 		}
 		CloseHandle(hSerial);
@@ -284,10 +355,16 @@ namespace agisotc
 					if (!line.empty() && line.back() == '\r')
 						line.pop_back();
 					if (!line.empty())
+					{
+						std::lock_guard<std::mutex> lock(mutex);
 						nmea.parse_sentence(line);
+					}
 					lineBuffer.erase(0, pos + 1);
 				}
-				fuse_solutions();
+				{
+					std::lock_guard<std::mutex> lock(mutex);
+					fuse_solutions();
+				}
 			}
 		}
 		close(fd);

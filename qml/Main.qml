@@ -5,7 +5,7 @@ import QtQuick.Layouts
 ApplicationWindow {
     id: root
     visible: true
-    width: 1440
+    width: 1600
     height: 900
     minimumWidth: 1100
     minimumHeight: 700
@@ -95,16 +95,20 @@ ApplicationWindow {
             }
 
             ColumnLayout {
-                Layout.preferredWidth: 400
+                Layout.preferredWidth: 420
                 Layout.fillHeight: true
                 spacing: 8
+                OperationsPanel {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 400
+                }
                 DdopPanel {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                 }
                 LogPanel {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 280
+                    Layout.preferredHeight: 190
                 }
             }
         }

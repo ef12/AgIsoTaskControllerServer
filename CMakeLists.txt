@@ -22,6 +22,7 @@ add_library(tcserver_core STATIC
   src/core/TcServerCore.cpp
   src/core/CanBusManager.cpp
   src/core/GpsProvider.cpp
+  src/core/FieldTaskManager.cpp
   src/core/NmeaParser.cpp
   src/core/IsoGpsHandler.cpp)
 target_include_directories(tcserver_core PUBLIC src/core)
@@ -30,6 +31,13 @@ target_link_libraries(tcserver_core
     isobus::Isobus
     isobus::HardwareIntegration
     isobus::Utility)
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(tcserver_core_tests tests/core_workflow_tests.cpp)
+  target_link_libraries(tcserver_core_tests PRIVATE tcserver_core)
+  add_test(NAME core_workflow COMMAND tcserver_core_tests)
+endif()
 
 if(AGISOTC_BUILD_GUI)
   find_package(Qt6 6.5 REQUIRED COMPONENTS Core Quick Quick3D Qml)
@@ -137,6 +145,7 @@ if(WIN32 AND AGISOTC_BUILD_GUI)
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/ProcessDataPanel.qml
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/CommandPanel.qml
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/SectionView3D.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/OperationsPanel.qml
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/LogPanel.qml
         ${CMAKE_CURRENT_BINARY_DIR}/stage
       COMMENT "Running windeployqt, staging Qt deps, and copying QML files"

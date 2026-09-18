@@ -10,6 +10,7 @@
 #include "IsoGpsHandler.hpp"
 
 #include <chrono>
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -67,6 +68,16 @@ namespace agisotc
 		/// @brief Enables/disables the built-in simulator.
 		void set_simulated(bool enabled);
 
+		/// @brief Sets the simulated position and motion.
+		void configure_simulation(double latitudeDeg, double longitudeDeg,
+		                          double speedMps, double courseDeg);
+
+		/// @brief Changes simulated speed and course without resetting the position.
+		void set_simulation_motion(double speedMps, double courseDeg);
+
+		/// @brief Rotates and moves the simulated receiver by an exact distance.
+		void nudge_simulation(double forwardMeters, double turnDegrees);
+
 	private:
 		void serial_thread_func();
 		void fuse_solutions();
@@ -79,8 +90,9 @@ namespace agisotc
 		std::thread serialThread;
 		std::string serialPort;
 		std::uint32_t baudRate = 115200;
-		bool running = false;
+		std::atomic_bool running = { false };
 		bool simulate = false;
+		std::uint64_t lastSimulationUpdateMs = 0;
 		GpsSolution fused;
 	};
 } // namespace agisotc

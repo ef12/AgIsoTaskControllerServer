@@ -1,11 +1,15 @@
 #include "TcBridge.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 #include <QDateTime>
 #include <QFile>
+#include <QVariantMap>
 
+#include "isobus/isobus/can_message.hpp"
+#include "isobus/isobus/can_network_manager.hpp"
 #include "isobus/isobus/isobus_device_descriptor_object_pool.hpp"
 #include "isobus/isobus/isobus_task_controller_client_objects.hpp"
 
@@ -13,6 +17,14 @@ namespace agisotc
 {
 	namespace
 	{
+		constexpr double EarthRadiusM = 6371000.0;
+		constexpr double DegreesToRadians = 3.14159265358979323846 / 180.0;
+		constexpr std::uint32_t GpsPositionPgn = 65267;
+		constexpr std::uint32_t GpsPositionDeltaPgn = 65268;
+		constexpr std::uint32_t GpsPositionDeltaHighPrecisionPgn = 65269;
+		constexpr std::uint32_t GpsPositionCovariancePgn = 65270;
+		constexpr std::uint32_t GpsPositionDeltaCovariancePgn = 65271;
+
 		QString timestamp_now()
 		{
 			return QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
@@ -77,6 +89,7 @@ namespace agisotc
 
 	TcBridge::~TcBridge()
 	{
+		stopGps();
 		stopServer();
 	}
 
@@ -113,6 +126,96 @@ namespace agisotc
 	QString TcBridge::statusText() const
 	{
 		return currentStatusText;
+	}
+
+	bool TcBridge::isGpsRunning() const
+	{
+		return gpsRunningFlag;
+	}
+
+	bool TcBridge::isGpsValid() const
+	{
+		return gpsRunningFlag && currentGps.valid;
+	}
+
+	QString TcBridge::gpsSourceText() const
+	{
+		return currentGpsSourceText;
+	}
+
+	double TcBridge::gpsLatitude() const
+	{
+		return currentGps.latitudeDeg.value_or(0.0);
+	}
+
+	double TcBridge::gpsLongitude() const
+	{
+		return currentGps.longitudeDeg.value_or(0.0);
+	}
+
+	double TcBridge::gpsSpeedKph() const
+	{
+		return currentGps.speedMps.value_or(0.0) * 3.6;
+	}
+
+	double TcBridge::gpsCourse() const
+	{
+		return currentGps.courseDeg.value_or(0.0);
+	}
+
+	double TcBridge::tractorX() const
+	{
+		return currentTractorX;
+	}
+
+	double TcBridge::tractorZ() const
+	{
+		return currentTractorZ;
+	}
+
+	QVariantList TcBridge::trackPoints() const
+	{
+		return currentTrackPoints;
+	}
+
+	QStringList TcBridge::fieldNames() const
+	{
+		return currentFieldNames;
+	}
+
+	QStringList TcBridge::taskNames() const
+	{
+		return currentTaskNames;
+	}
+
+	int TcBridge::selectedFieldIndex() const
+	{
+		return currentSelectedField;
+	}
+
+	int TcBridge::selectedTaskIndex() const
+	{
+		return currentSelectedTask;
+	}
+
+	QString TcBridge::activeFieldName() const
+	{
+		return currentActiveFieldName;
+	}
+
+	QString TcBridge::activeTaskName() const
+	{
+		return currentActiveTaskName;
+	}
+
+	double TcBridge::fieldWidthM() const
+	{
+		return currentFieldWidthM;
+	}
+
+	double TcBridge::fieldLengthM() const
+	{
+		return currentFieldLengthM;
 	}
 
 	ClientListModel *TcBridge::clientModel()
@@ -160,6 +263,7 @@ namespace agisotc
 			logs.addLine(QString("[bus] %1").arg(QString::fromStdString(error)));
 			return false;
 		}
+		registerGpsCanCallbacks();
 
 		auto options = isobus::TaskControllerOptions()
 		                 .with_documentation()
@@ -175,6 +279,7 @@ namespace agisotc
 		server->get_language_command_interface().set_language_code("en");
 		server->get_language_command_interface().set_country_code("US");
 		server->initialize();
+		server->set_task_totals_active(taskActive);
 
 		pumpRunning = true;
 		pumpThread = std::thread(&TcBridge::pumpLoop, this);
@@ -202,11 +307,10 @@ namespace agisotc
 			server->terminate();
 			server.reset();
 		}
+		unregisterGpsCanCallbacks();
 		canBus.stop();
 		running = false;
-		taskActive = false;
 		emit runningChanged();
-		emit taskActiveChanged();
 		setStatus("Server stopped.");
 		logs.addLine("[bus] Server stopped.");
 	}
@@ -225,6 +329,7 @@ namespace agisotc
 
 	void TcBridge::poll()
 	{
+		updateGps();
 		if (!running || (nullptr == server))
 		{
 			return;
@@ -413,15 +518,14 @@ namespace agisotc
 
 	void TcBridge::setTaskActive(bool active)
 	{
-		if (!running || (nullptr == server))
+		if (active)
 		{
-			setStatus("Start the server first.");
-			return;
+			startSelectedTask();
 		}
-		server->set_task_totals_active(active);
-		taskActive = server->get_task_totals_active();
-		emit taskActiveChanged();
-		logs.addLine(QString("[task] Task totals %1.").arg(taskActive ? "ACTIVE" : "stopped"));
+		else
+		{
+			stopSelectedTask();
+		}
 	}
 
 	void TcBridge::requestValue(int ddi, int element)
@@ -565,6 +669,435 @@ namespace agisotc
 			server->clear_stored_pool(static_cast<std::uint8_t>(currentSelectedClient));
 		}
 		refreshDdop();
+	}
+
+	bool TcBridge::startGps(const QString &source, const QString &serialPort, int baudRate,
+	                        double latitude, double longitude)
+	{
+		gpsProvider.stop();
+		currentGpsSourceText = source;
+		if (source.compare("Simulated", Qt::CaseInsensitive) == 0)
+		{
+			gpsProvider.configure_simulation(latitude, longitude, 0.0, 0.0);
+		}
+		else
+		{
+			GpsSource gpsSource = GpsSource::Auto;
+			if (source.compare("NMEA serial", Qt::CaseInsensitive) == 0)
+			{
+				if (serialPort.trimmed().isEmpty())
+				{
+					setStatus("Enter a serial port for NMEA GPS (for example COM4). ");
+					return false;
+				}
+				gpsSource = GpsSource::NmeaOnly;
+			}
+			else if (source.compare("ISO CAN", Qt::CaseInsensitive) == 0)
+			{
+				gpsSource = GpsSource::IsoOnly;
+			}
+			gpsProvider.set_source(gpsSource);
+			if (!gpsProvider.start(serialPort.trimmed().toStdString(), static_cast<std::uint32_t>(qBound(1200, baudRate, 921600))))
+			{
+				setStatus("GPS source could not be started.");
+				return false;
+			}
+		}
+		gpsRunningFlag = true;
+		setStatus(QString("GPS started: %1.").arg(source));
+		logs.addLine(QString("[gps] Source started: %1.").arg(source));
+		emit gpsChanged();
+		return true;
+	}
+
+	void TcBridge::stopGps()
+	{
+		if (!gpsRunningFlag)
+		{
+			return;
+		}
+		gpsProvider.stop();
+		gpsRunningFlag = false;
+		currentGps.valid = false;
+		currentGpsSourceText = "Off";
+		logs.addLine("[gps] Source stopped.");
+		emit gpsChanged();
+	}
+
+	void TcBridge::setSimulationMotion(double speedKph, double courseDeg)
+	{
+		if (!gpsRunningFlag || (currentGpsSourceText != "Simulated"))
+		{
+			setStatus("Start simulated GPS before changing its motion.");
+			return;
+		}
+		gpsProvider.set_simulation_motion(std::max(0.0, speedKph) / 3.6, courseDeg);
+	}
+
+	void TcBridge::nudgeSimulation(double forwardMeters, double turnDegrees)
+	{
+		if (!gpsRunningFlag || (currentGpsSourceText != "Simulated"))
+		{
+			setStatus("Start simulated GPS before moving the tractor.");
+			return;
+		}
+		gpsProvider.nudge_simulation(forwardMeters, turnDegrees);
+		updateGps();
+	}
+
+	bool TcBridge::createField(const QString &name, double widthM, double lengthM)
+	{
+		if (!currentGps.valid || !currentGps.latitudeDeg || !currentGps.longitudeDeg)
+		{
+			setStatus("Start GPS and wait for a valid position before defining a field.");
+			return false;
+		}
+		if (name.trimmed().isEmpty())
+		{
+			setStatus("Enter a field name.");
+			return false;
+		}
+		widthM = std::clamp(widthM, 1.0, 100000.0);
+		lengthM = std::clamp(lengthM, 1.0, 100000.0);
+		const double latitude = *currentGps.latitudeDeg;
+		const double longitude = *currentGps.longitudeDeg;
+		const double latitudeOffset = (lengthM * 0.5 / EarthRadiusM) / DegreesToRadians;
+		const double longitudeScale = std::max(0.01, std::cos(latitude * DegreesToRadians));
+		const double longitudeOffset = (widthM * 0.5 / (EarthRadiusM * longitudeScale)) / DegreesToRadians;
+
+		FieldBoundary field;
+		field.name = name.trimmed().toStdString();
+		field.exteriorRing = {
+			{ latitude - latitudeOffset, longitude - longitudeOffset },
+			{ latitude - latitudeOffset, longitude + longitudeOffset },
+			{ latitude + latitudeOffset, longitude + longitudeOffset },
+			{ latitude + latitudeOffset, longitude - longitudeOffset },
+			{ latitude - latitudeOffset, longitude - longitudeOffset }
+		};
+		const std::string fieldId = fieldTaskManager.add_field(field);
+		if (fieldId.empty())
+		{
+			setStatus("Field could not be created.");
+			return false;
+		}
+		refreshFieldNames();
+		const auto selected = std::find(fieldIds.begin(), fieldIds.end(), fieldId);
+		selectField(static_cast<int>(std::distance(fieldIds.begin(), selected)));
+		clearTrack();
+		setStatus(QString("Field '%1' created at the current GPS position.").arg(name.trimmed()));
+		logs.addLine(QString("[field] Created %1 (%2 m x %3 m).").arg(name.trimmed()).arg(widthM, 0, 'f', 1).arg(lengthM, 0, 'f', 1));
+		return true;
+	}
+
+	void TcBridge::selectField(int index)
+	{
+		if ((index < 0) || (index >= static_cast<int>(fieldIds.size())))
+		{
+			return;
+		}
+		currentSelectedField = index;
+		updateFieldSelection();
+		emit fieldsChanged();
+	}
+
+	bool TcBridge::createTask(const QString &name)
+	{
+		if ((currentSelectedField < 0) || (currentSelectedField >= static_cast<int>(fieldIds.size())))
+		{
+			setStatus("Create or select a field before creating a task.");
+			return false;
+		}
+		if (name.trimmed().isEmpty())
+		{
+			setStatus("Enter a task name.");
+			return false;
+		}
+		Task task;
+		task.name = name.trimmed().toStdString();
+		task.fieldId = fieldIds[static_cast<std::size_t>(currentSelectedField)];
+		if (currentSelectedClient >= 0)
+		{
+			task.clientId = std::to_string(currentSelectedClient);
+		}
+		const std::string taskId = fieldTaskManager.create_task(task);
+		if (taskId.empty())
+		{
+			setStatus("Task could not be created.");
+			return false;
+		}
+		refreshTaskNames();
+		const auto selected = std::find(taskIds.begin(), taskIds.end(), taskId);
+		selectTask(static_cast<int>(std::distance(taskIds.begin(), selected)));
+		setStatus(QString("Task '%1' created for field '%2'.").arg(name.trimmed(), currentActiveFieldName));
+		logs.addLine(QString("[task] Created %1 for %2.").arg(name.trimmed(), currentActiveFieldName));
+		return true;
+	}
+
+	void TcBridge::selectTask(int index)
+	{
+		if ((index < 0) || (index >= static_cast<int>(taskIds.size())))
+		{
+			return;
+		}
+		currentSelectedTask = index;
+		const auto task = fieldTaskManager.get_task(taskIds[static_cast<std::size_t>(index)]);
+		if (task)
+		{
+			const auto field = std::find(fieldIds.begin(), fieldIds.end(), task->fieldId);
+			if (field != fieldIds.end())
+			{
+				currentSelectedField = static_cast<int>(std::distance(fieldIds.begin(), field));
+				updateFieldSelection();
+				emit fieldsChanged();
+			}
+		}
+		emit tasksChanged();
+	}
+
+	void TcBridge::startSelectedTask()
+	{
+		if ((currentSelectedTask < 0) || (currentSelectedTask >= static_cast<int>(taskIds.size())))
+		{
+			setStatus("Create or select a task first.");
+			return;
+		}
+		const std::string &taskId = taskIds[static_cast<std::size_t>(currentSelectedTask)];
+		if (!fieldTaskManager.start_task(taskId))
+		{
+			setStatus("Task could not be started.");
+			return;
+		}
+		taskActive = true;
+		currentActiveTaskName = currentTaskNames.at(currentSelectedTask);
+		if (nullptr != server)
+		{
+			server->set_task_totals_active(true);
+		}
+		emit taskActiveChanged();
+		emit tasksChanged();
+		setStatus(QString("Task '%1' is active.").arg(currentActiveTaskName));
+		logs.addLine(QString("[task] Started %1.").arg(currentActiveTaskName));
+	}
+
+	void TcBridge::pauseSelectedTask()
+	{
+		if ((currentSelectedTask < 0) || (currentSelectedTask >= static_cast<int>(taskIds.size())))
+		{
+			return;
+		}
+		if (fieldTaskManager.pause_task(taskIds[static_cast<std::size_t>(currentSelectedTask)]))
+		{
+			taskActive = false;
+			if (nullptr != server)
+			{
+				server->set_task_totals_active(false);
+			}
+			emit taskActiveChanged();
+			emit tasksChanged();
+			setStatus(QString("Task '%1' paused.").arg(currentActiveTaskName));
+			logs.addLine(QString("[task] Paused %1.").arg(currentActiveTaskName));
+		}
+	}
+
+	void TcBridge::stopSelectedTask()
+	{
+		if ((currentSelectedTask < 0) || (currentSelectedTask >= static_cast<int>(taskIds.size())))
+		{
+			return;
+		}
+		const QString stoppedName = currentTaskNames.at(currentSelectedTask);
+		if (fieldTaskManager.stop_task(taskIds[static_cast<std::size_t>(currentSelectedTask)]))
+		{
+			taskActive = false;
+			currentActiveTaskName.clear();
+			if (nullptr != server)
+			{
+				server->set_task_totals_active(false);
+			}
+			emit taskActiveChanged();
+			emit tasksChanged();
+			setStatus(QString("Task '%1' completed.").arg(stoppedName));
+			logs.addLine(QString("[task] Completed %1.").arg(stoppedName));
+		}
+	}
+
+	void TcBridge::clearTrack()
+	{
+		currentTrackPoints.clear();
+		emit trackChanged();
+	}
+
+	void TcBridge::updateGps()
+	{
+		if (!gpsRunningFlag)
+		{
+			return;
+		}
+		gpsProvider.update();
+		const GpsSolution solution = gpsProvider.current_solution();
+		if (!solution.valid || !solution.latitudeDeg || !solution.longitudeDeg)
+		{
+			if (currentGps.valid)
+			{
+				currentGps = solution;
+				emit gpsChanged();
+			}
+			return;
+		}
+		currentGps = solution;
+		if (!fieldOriginValid)
+		{
+			fieldOriginLatitude = *solution.latitudeDeg;
+			fieldOriginLongitude = *solution.longitudeDeg;
+			fieldOriginValid = true;
+		}
+		currentTractorX = (*solution.longitudeDeg - fieldOriginLongitude) * DegreesToRadians * EarthRadiusM *
+		                  std::cos(fieldOriginLatitude * DegreesToRadians);
+		const double north = (*solution.latitudeDeg - fieldOriginLatitude) * DegreesToRadians * EarthRadiusM;
+		currentTractorZ = -north;
+
+		bool appendPoint = currentTrackPoints.isEmpty();
+		if (!appendPoint)
+		{
+			const QVariantMap last = currentTrackPoints.constLast().toMap();
+			appendPoint = std::hypot(currentTractorX - last.value("x").toDouble(),
+			                         currentTractorZ - last.value("z").toDouble()) >= 0.75;
+		}
+		if (appendPoint)
+		{
+			QVariantMap point;
+			point.insert("x", currentTractorX);
+			point.insert("z", currentTractorZ);
+			currentTrackPoints.push_back(point);
+			if (currentTrackPoints.size() > 800)
+			{
+				currentTrackPoints.removeFirst();
+			}
+			emit trackChanged();
+		}
+		fieldTaskManager.on_position_update(solution);
+		emit gpsChanged();
+	}
+
+	void TcBridge::refreshFieldNames()
+	{
+		fieldIds.clear();
+		currentFieldNames.clear();
+		for (const auto &field : fieldTaskManager.list_fields())
+		{
+			fieldIds.push_back(field.id);
+			currentFieldNames.push_back(QString::fromStdString(field.name));
+		}
+		emit fieldsChanged();
+	}
+
+	void TcBridge::refreshTaskNames()
+	{
+		taskIds.clear();
+		currentTaskNames.clear();
+		for (const auto &task : fieldTaskManager.list_tasks())
+		{
+			taskIds.push_back(task.id);
+			currentTaskNames.push_back(QString::fromStdString(task.name));
+		}
+		emit tasksChanged();
+	}
+
+	void TcBridge::updateFieldSelection()
+	{
+		if ((currentSelectedField < 0) || (currentSelectedField >= static_cast<int>(fieldIds.size())))
+		{
+			return;
+		}
+		const auto field = fieldTaskManager.get_field(fieldIds[static_cast<std::size_t>(currentSelectedField)]);
+		if (!field || field->exteriorRing.empty())
+		{
+			return;
+		}
+		std::size_t pointCount = field->exteriorRing.size();
+		if ((pointCount > 1) && (field->exteriorRing.front() == field->exteriorRing.back()))
+		{
+			--pointCount;
+		}
+		double latitudeSum = 0.0;
+		double longitudeSum = 0.0;
+		for (std::size_t index = 0; index < pointCount; ++index)
+		{
+			latitudeSum += field->exteriorRing[index].first;
+			longitudeSum += field->exteriorRing[index].second;
+		}
+		fieldOriginLatitude = latitudeSum / static_cast<double>(pointCount);
+		fieldOriginLongitude = longitudeSum / static_cast<double>(pointCount);
+		fieldOriginValid = true;
+		double minimumX = 0.0;
+		double maximumX = 0.0;
+		double minimumNorth = 0.0;
+		double maximumNorth = 0.0;
+		for (std::size_t index = 0; index < pointCount; ++index)
+		{
+			const double x = (field->exteriorRing[index].second - fieldOriginLongitude) * DegreesToRadians *
+			                 EarthRadiusM * std::cos(fieldOriginLatitude * DegreesToRadians);
+			const double north = (field->exteriorRing[index].first - fieldOriginLatitude) * DegreesToRadians * EarthRadiusM;
+			if (0 == index)
+			{
+				minimumX = maximumX = x;
+				minimumNorth = maximumNorth = north;
+			}
+			else
+			{
+				minimumX = std::min(minimumX, x);
+				maximumX = std::max(maximumX, x);
+				minimumNorth = std::min(minimumNorth, north);
+				maximumNorth = std::max(maximumNorth, north);
+			}
+		}
+		currentFieldWidthM = maximumX - minimumX;
+		currentFieldLengthM = maximumNorth - minimumNorth;
+		currentActiveFieldName = QString::fromStdString(field->name);
+		clearTrack();
+	}
+
+	void TcBridge::registerGpsCanCallbacks()
+	{
+		if (gpsCanCallbacksRegistered)
+		{
+			return;
+		}
+		for (const std::uint32_t pgn : { GpsPositionPgn, GpsPositionDeltaPgn, GpsPositionDeltaHighPrecisionPgn,
+		                                 GpsPositionCovariancePgn, GpsPositionDeltaCovariancePgn })
+		{
+			isobus::CANNetworkManager::CANNetwork.add_any_control_function_parameter_group_number_callback(
+			  pgn, processGpsCanMessage, this);
+		}
+		gpsCanCallbacksRegistered = true;
+	}
+
+	void TcBridge::unregisterGpsCanCallbacks()
+	{
+		if (!gpsCanCallbacksRegistered)
+		{
+			return;
+		}
+		for (const std::uint32_t pgn : { GpsPositionPgn, GpsPositionDeltaPgn, GpsPositionDeltaHighPrecisionPgn,
+		                                 GpsPositionCovariancePgn, GpsPositionDeltaCovariancePgn })
+		{
+			isobus::CANNetworkManager::CANNetwork.remove_any_control_function_parameter_group_number_callback(
+			  pgn, processGpsCanMessage, this);
+		}
+		gpsCanCallbacksRegistered = false;
+	}
+
+	void TcBridge::processGpsCanMessage(const isobus::CANMessage &message, void *parentPointer)
+	{
+		auto *bridge = static_cast<TcBridge *>(parentPointer);
+		if (nullptr == bridge)
+		{
+			return;
+		}
+		const auto &data = message.get_data();
+		bridge->gpsProvider.feed_can_message(message.get_identifier().get_parameter_group_number(),
+		                                     data.data(),
+		                                     static_cast<std::uint8_t>(std::min<std::size_t>(data.size(), 255)));
 	}
 
 	void TcBridge::clearLog()
