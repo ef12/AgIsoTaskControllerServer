@@ -1,0 +1,116 @@
+name: Build Release
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+env:
+  CAN_STACK_REF: 1eb0a89f21e0c2ea57a2c63b93a7d3b2218bc66f
+  SIL_REF: d8a869322c7a782bb197662deff67045dc353c7c
+  QT_VERSION: '6.5.3'
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout AgIsoStack++
+        uses: actions/checkout@v4
+        with:
+          repository: ef12/AgIsoStack-plus-plus
+          ref: ${{ env.CAN_STACK_REF }}
+          path: _dependencies/AgIsoStack-plus-plus
+
+      - name: Checkout SIL
+        uses: actions/checkout@v4
+        with:
+          repository: ef12/SIL
+          ref: ${{ env.SIL_REF }}
+          path: _dependencies/SIL
+
+      - name: Build WCAN dependency
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Add-Content -LiteralPath .git/info/exclude -Value "/_dependencies/"
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/vswhere.exe"
+          $vsInstall = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1).Trim()
+          if ([string]::IsNullOrWhiteSpace($vsInstall)) {
+            throw "Visual Studio C++ build tools were not found."
+          }
+          $env:WCAN_VCVARS = Join-Path $vsInstall "VC/Auxiliary/Build/vcvars64.bat"
+          & ./_dependencies/AgIsoStack-plus-plus/tools/sync_wcan.ps1 -Source ./_dependencies/SIL
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          $wcanLibrary = "./_dependencies/AgIsoStack-plus-plus/hardware_integration/lib/Windows/wcan_x64.lib"
+          if (-not (Test-Path -LiteralPath $wcanLibrary)) {
+            throw "WCAN library was not produced: $wcanLibrary"
+          }
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+          modules: 'qtshadertools qtquick3d qtquicktimeline'
+
+      - name: Install NSIS
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress
+          echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
+
+      - name: Configure CMake
+        shell: pwsh
+        run: |
+          $stackSource = (Resolve-Path ./_dependencies/AgIsoStack-plus-plus).Path.Replace('\', '/')
+          $silSource = (Resolve-Path ./_dependencies/SIL).Path.Replace('\', '/')
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release `
+            "-DFETCHCONTENT_SOURCE_DIR_CAN_STACK=$stackSource" `
+            "-DFETCHCONTENT_SOURCE_DIR_SIL=$silSource"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build Release
+        run: cmake --build build --config Release --parallel
+
+      - name: Package
+        working-directory: build
+        run: cpack --config CPackConfig.cmake -C Release -G NSIS
+
+      - name: Verify installer
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -LiteralPath build -Filter "AgIsoTaskControllerServer-*.exe"
+          if ($installer.Count -ne 1) {
+            throw "Expected one NSIS installer, found $($installer.Count)."
+          }
+          $installer | Select-Object Name, Length
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: AgIsoTaskControllerServer-windows
+          path: build/AgIsoTaskControllerServer-*.exe
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/AgIsoTaskControllerServer-*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -57,4 +57,56 @@ if(AGISOTC_BUILD_GUI)
       target_link_options(AgIsoTaskControllerServer PRIVATE /NODEFAULTLIB:LIBCMT)
     endif()
   endif()
+
+  # Install the executable and QML resources
+  install(TARGETS AgIsoTaskControllerServer
+    RUNTIME DESTINATION bin
+    COMPONENT applications)
+  install(FILES qml/Main.qml qml/TopBar.qml qml/ClientsPanel.qml qml/DdopPanel.qml
+    qml/ProcessDataPanel.qml qml/CommandPanel.qml qml/SectionView3D.qml qml/LogPanel.qml
+    DESTINATION qml
+    COMPONENT applications)
 endif()
+
+# CPack packaging (NSIS on Windows, DMG on macOS, DEB on Linux)
+set(CPACK_PACKAGE_NAME "AgIsoTaskControllerServer")
+set(CPACK_PACKAGE_VENDOR "Open-Agriculture")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "An ISO11783-10 Task Controller Server")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
+set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
+set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "AgIsoTaskControllerServer")
+set(CPACK_COMPONENTS_ALL applications)
+set(CPACK_COMPONENT_APPLICATIONS_DISPLAY_NAME "AgIsoTaskControllerServer")
+set(CPACK_COMPONENT_APPLICATIONS_DESCRIPTION "A free and open source ISO11783-10 Task Controller Server")
+set(CPACK_PACKAGE_CONTACT "delgrossoengineering@protonmail.com")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_PACKAGE_EXECUTABLES "AgIsoTaskControllerServer" "AgIsoTaskControllerServer")
+set(CPACK_ALL_INSTALL_TYPES Full)
+set(CPACK_COMPONENT_LIBRARIES_INSTALL_TYPES Full)
+set(CPACK_COMPONENT_APPLICATIONS_INSTALL_TYPES Full)
+
+# Windows-only NSIS installer
+if(WIN32)
+  set(CPACK_GENERATOR "NSIS")
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/doc/logo.ico")
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "${CMAKE_CURRENT_SOURCE_DIR}/doc/logo.ico")
+    set(CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_SOURCE_DIR}/doc/logo.ico")
+    set(CPACK_NSIS_MUI_UNICON "${CMAKE_CURRENT_SOURCE_DIR}/doc/logo.ico")
+  endif()
+  set(CPACK_NSIS_CONTACT ${CPACK_PACKAGE_CONTACT})
+  set(CPACK_NSIS_DISPLAY_NAME "AgIsoTaskControllerServer")
+  set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+else()
+  set(CPACK_GENERATOR "ZIP")
+endif()
+
+# Only package the 'applications' component (app + QML + runtime), exclude default component (stack)
+set(CPACK_COMPONENTS_ALL "applications")
+set(CPACK_COMPONENT_DEFAULT_INSTALL_TYPES "")
+
+# Only install the application target and QML files - not the transitive stack dependencies
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT applications)
+include(InstallRequiredSystemLibraries)
+include(CPack)
