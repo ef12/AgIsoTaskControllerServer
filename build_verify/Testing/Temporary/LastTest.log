@@ -1,0 +1,18 @@
+Start testing: Sep 19 14:31 W. Europe Daylight Time
+----------------------------------------------------------
+1/1 Testing: core_workflow
+1/1 Test: core_workflow
+Command: "C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/Release/tcserver_core_tests.exe"
+Directory: C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify
+"core_workflow" start time: Sep 19 14:31 W. Europe Daylight Time
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.13 sec
+----------------------------------------------------------
+Test Passed.
+"core_workflow" end time: Sep 19 14:31 W. Europe Daylight Time
+"core_workflow" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Sep 19 14:31 W. Europe Daylight Time

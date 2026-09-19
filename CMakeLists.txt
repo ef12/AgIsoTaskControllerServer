@@ -6,6 +6,7 @@ project(
   VERSION 0.1.0)
 
 option(AGISOTC_BUILD_GUI "Build the Qt Quick GUI application" ON)
+option(AGISOTC_BUILD_TESTS "Build AgIsoTaskControllerServer tests" OFF)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,14 +18,15 @@ FetchContent_Declare(
   GIT_TAG 1eb0a89f21e0c2ea57a2c63b93a7d3b2218bc66f)
 FetchContent_MakeAvailable(CAN_STACK)
 
-# Core library: TC server wrapper + CAN setup + GPS + Field/Task. No Qt dependency.
+# Core library: TC server wrapper + CAN setup + GPS + Field/Task + FieldTracker. No Qt dependency.
 add_library(tcserver_core STATIC
   src/core/TcServerCore.cpp
   src/core/CanBusManager.cpp
   src/core/GpsProvider.cpp
   src/core/FieldTaskManager.cpp
   src/core/NmeaParser.cpp
-  src/core/IsoGpsHandler.cpp)
+  src/core/IsoGpsHandler.cpp
+  src/core/FieldTracker.cpp)
 target_include_directories(tcserver_core PUBLIC src/core)
 target_link_libraries(tcserver_core
   PUBLIC
@@ -32,8 +34,8 @@ target_link_libraries(tcserver_core
     isobus::HardwareIntegration
     isobus::Utility)
 
-include(CTest)
-if(BUILD_TESTING)
+if(AGISOTC_BUILD_TESTS)
+  enable_testing()
   add_executable(tcserver_core_tests tests/core_workflow_tests.cpp)
   target_link_libraries(tcserver_core_tests PRIVATE tcserver_core)
   add_test(NAME core_workflow COMMAND tcserver_core_tests)
@@ -49,6 +51,10 @@ if(AGISOTC_BUILD_GUI)
     src/gui/TcBridge.cpp
     src/gui/TcModels.cpp
     resources.qrc)
+
+  if(WIN32)
+    target_sources(AgIsoTaskControllerServer PRIVATE src/gui/app.rc)
+  endif()
 
   target_link_libraries(AgIsoTaskControllerServer
     PRIVATE

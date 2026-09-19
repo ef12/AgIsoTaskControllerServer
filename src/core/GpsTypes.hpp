@@ -102,6 +102,7 @@ namespace agisotc
 		std::vector<std::pair<double, double>> exteriorRing; ///< (lat, lon) in degrees, CCW
 		std::vector<std::vector<std::pair<double, double>>> interiorRings; ///< Holes, CW
 		std::uint64_t createdMs = 0;
+		double areaHectares = 0.0; ///< Cached polygon area, filled by FieldTracker on record
 	};
 
 	/// @brief Guidance line (AB line or curve)

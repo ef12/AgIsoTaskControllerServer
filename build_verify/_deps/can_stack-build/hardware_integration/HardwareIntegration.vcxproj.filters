@@ -1,0 +1,66 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\src\can_hardware_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\src\vector_asc_logger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\src\pcan_basic_windows_plugin.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\src\wcan_plugin.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\include\isobus\hardware_integration\can_hardware_interface.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\include\isobus\hardware_integration\can_hardware_plugin.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\include\isobus\hardware_integration\vector_asc_logger.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\include\isobus\hardware_integration\available_can_drivers.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\include\isobus\hardware_integration\pcan_basic_windows_plugin.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\include\isobus\hardware_integration\wcan_plugin.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\include\isobus\hardware_integration\wcan.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\include\isobus\hardware_integration\wcan_types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\include\isobus\hardware_integration\wcan_validate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\include\isobus\hardware_integration\wcan_airtime.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\include\isobus\hardware_integration\wcan_export.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\include\isobus\hardware_integration\wcan_layout.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\hardware_integration\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{9352DA86-C2C4-3833-8B99-2D7CFFFCAA3D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{35E717EC-C50A-3F41-A185-D4838D056743}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

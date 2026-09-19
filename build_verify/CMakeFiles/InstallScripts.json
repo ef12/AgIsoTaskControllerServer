@@ -1,0 +1,11 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/cmake_install.cmake",
+		"C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-build/cmake_install.cmake",
+		"C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-build/utility/cmake_install.cmake",
+		"C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-build/isobus/cmake_install.cmake",
+		"C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-build/hardware_integration/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

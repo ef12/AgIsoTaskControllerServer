@@ -4,6 +4,7 @@
 /// @brief Entry point: wires the bridge and models into QML and shows the main window.
 //================================================================================================
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QUrl>
@@ -15,6 +16,7 @@ int main(int argc, char *argv[])
 	QGuiApplication app(argc, argv);
 	app.setApplicationName("AgIsoTaskControllerServer");
 	app.setOrganizationName("Open-Agriculture");
+	app.setWindowIcon(QIcon(QStringLiteral(":/icons/logo.ico")));
 
 	agisotc::TcBridge bridge;
 

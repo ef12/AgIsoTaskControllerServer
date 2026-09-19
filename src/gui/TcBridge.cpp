@@ -1,8 +1,10 @@
 #include "TcBridge.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
+#include <map>
 
 #include <QDateTime>
 #include <QFile>
@@ -12,6 +14,7 @@
 #include "isobus/isobus/can_network_manager.hpp"
 #include "isobus/isobus/isobus_device_descriptor_object_pool.hpp"
 #include "isobus/isobus/isobus_task_controller_client_objects.hpp"
+#include "isobus/isobus/isobus_standard_data_description_indices.hpp"
 
 namespace agisotc
 {
@@ -77,6 +80,67 @@ namespace agisotc
 				              object.get_object_id(), object.get_designator().c_str());
 			}
 			return QString::fromUtf8(buffer);
+		}
+
+		double geometry_value_metres(isobus::DeviceDescriptorObjectPool &pool,
+		                             std::int32_t rawValue,
+		                             std::uint16_t presentationId)
+		{
+			double value = static_cast<double>(rawValue);
+			if (isobus::NULL_OBJECT_ID != presentationId)
+			{
+				auto presentationObject = pool.get_object_by_id(presentationId);
+				if (auto *presentation = dynamic_cast<isobus::task_controller_object::DeviceValuePresentationObject *>(presentationObject.get()))
+				{
+					value = (value + presentation->get_offset()) * presentation->get_scale();
+					const QString unit = QString::fromStdString(presentation->get_designator()).trimmed().toLower();
+					if ((unit == "mm") || unit.contains("millimet"))
+					{
+						value /= 1000.0;
+					}
+					else if ((unit == "cm") || unit.contains("centimet"))
+					{
+						value /= 100.0;
+					}
+					return value;
+				}
+			}
+			// ISO 11783 geometry values without a presentation are expressed in millimetres.
+			return value / 1000.0;
+		}
+
+		QString trigger_text(std::uint8_t triggers)
+		{
+			QStringList result;
+			using Trigger = isobus::task_controller_object::DeviceProcessDataObject::AvailableTriggerMethods;
+			if (triggers & static_cast<std::uint8_t>(Trigger::TimeInterval)) result << "time";
+			if (triggers & static_cast<std::uint8_t>(Trigger::DistanceInterval)) result << "distance";
+			if (triggers & static_cast<std::uint8_t>(Trigger::ThresholdLimits)) result << "threshold";
+			if (triggers & static_cast<std::uint8_t>(Trigger::OnChange)) result << "change";
+			if (triggers & static_cast<std::uint8_t>(Trigger::Total)) result << "total";
+			return result.isEmpty() ? "request" : result.join(", ");
+		}
+
+		QString tc_basic_label(std::uint16_t ddi)
+		{
+			using DDI = isobus::DataDescriptionIndex;
+			switch (static_cast<DDI>(ddi))
+			{
+				case DDI::ActualWorkState: return "Work state";
+				case DDI::ActualVolumePerAreaApplicationRate: return "Actual volume rate";
+				case DDI::ActualMassPerAreaApplicationRate: return "Actual mass rate";
+				case DDI::ActualCountPerAreaApplicationRate: return "Actual count rate";
+				case DDI::ApplicationTotalVolume_L: return "Applied volume";
+				case DDI::ApplicationTotalMass_kg: return "Applied mass";
+				case DDI::ApplicationTotalCount: return "Applied count";
+				case DDI::TotalArea: return "Worked area";
+				case DDI::EffectiveTotalDistance: return "Working distance";
+				case DDI::EffectiveTotalTime: return "Working time";
+				case DDI::ActualPercentageApplicationRate: return "Actual application rate";
+				case DDI::LoadedTotalMass: return "Loaded mass";
+				case DDI::UnloadedTotalMass: return "Unloaded mass";
+				default: return {};
+			}
 		}
 	} // namespace
 
@@ -177,6 +241,10 @@ namespace agisotc
 	{
 		return currentTrackPoints;
 	}
+	QVariantList TcBridge::workedPoints() const { return currentWorkedPoints; }
+	QVariantList TcBridge::fieldBoundaryPoints() const { return currentFieldBoundaryPoints; }
+	bool TcBridge::boundaryRecording() const { return boundaryRecordingFlag; }
+	int TcBridge::boundaryPointCount() const { return static_cast<int>(recordedBoundary.size()); }
 
 	QStringList TcBridge::fieldNames() const
 	{
@@ -217,6 +285,27 @@ namespace agisotc
 	{
 		return currentFieldLengthM;
 	}
+
+	QString TcBridge::implementName() const { return currentImplementName; }
+	QString TcBridge::implementGeometryStatus() const { return currentImplementGeometryStatus; }
+	QVariantList TcBridge::implementElements() const { return currentImplementElements; }
+	QVariantList TcBridge::implementDdis() const { return currentImplementDdis; }
+	bool TcBridge::autoDdiSync() const { return autoDdiSyncEnabled; }
+	int TcBridge::ddiSyncIntervalMs() const { return currentDdiSyncIntervalMs; }
+	QVariantList TcBridge::tcBasicData() const { return currentTcBasicData; }
+	int TcBridge::activeSectionCount() const
+	{
+		return static_cast<int>(std::count_if(currentSectionStates.cbegin(), currentSectionStates.cend(),
+		                                      [](const QVariant &value) { return value.toBool(); }));
+	}
+	double TcBridge::workedAreaHa() const { return currentWorkedAreaHa; }
+	double TcBridge::workedDistanceM() const { return currentWorkedDistanceM; }
+	double TcBridge::workedTimeSeconds() const { return currentWorkedTimeSeconds; }
+	double TcBridge::steeringAngle() const { return currentSteeringAngle; }
+	double TcBridge::throttleKph() const { return currentThrottleKph; }
+	double TcBridge::implementX() const { return currentImplementX; }
+	double TcBridge::implementZ() const { return currentImplementZ; }
+	double TcBridge::implementCourse() const { return currentImplementCourse; }
 
 	ClientListModel *TcBridge::clientModel()
 	{
@@ -309,6 +398,8 @@ namespace agisotc
 		}
 		unregisterGpsCanCallbacks();
 		canBus.stop();
+		for (auto &state : implementDdiStates) state.reportingConfigured = false;
+		lastDdiSyncMs = 0;
 		running = false;
 		emit runningChanged();
 		setStatus("Server stopped.");
@@ -342,6 +433,10 @@ namespace agisotc
 		for (const auto &value : events.values)
 		{
 			values.upsertValue(value.address, value.ddi, value.element, value.value, timestamp_now());
+			if (static_cast<int>(value.address) == currentSelectedClient)
+			{
+				updateImplementValue(value.ddi, value.element, value.value);
+			}
 			if ((0 != currentSectionDdi) && (value.ddi == currentSectionDdi) &&
 			    (value.element >= 1) && (value.element <= currentSectionCount))
 			{
@@ -378,6 +473,7 @@ namespace agisotc
 		{
 			emit identifyBanner(events.identifyNumber);
 		}
+		serviceDdiSync();
 	}
 
 	void TcBridge::refreshClients()
@@ -402,6 +498,14 @@ namespace agisotc
 		}
 		std::sort(rows.begin(), rows.end(), [](const ClientRow &left, const ClientRow &right) { return left.address < right.address; });
 		clients.setClients(rows);
+		if ((-1 == currentSelectedClient) && !rows.empty())
+		{
+			auto preferred = std::find_if(rows.cbegin(), rows.cend(), [](const ClientRow &row) { return row.ddopActive && !row.timedOut; });
+			if (preferred == rows.cend()) preferred = rows.cbegin();
+			currentSelectedClient = preferred->address;
+			emit selectedClientChanged();
+			refreshDdop();
+		}
 
 		bool stillThere = false;
 		for (const auto &row : rows)
@@ -423,6 +527,7 @@ namespace agisotc
 	{
 		QList<DdopRow> rows;
 		std::vector<std::uint8_t> binary;
+		clearImplementModel();
 
 		if ((manualPoolClient == currentSelectedClient) && !manualPool.empty())
 		{
@@ -453,6 +558,7 @@ namespace agisotc
 			}
 			else
 			{
+				buildImplementModel(pool);
 				rows.push_back({ 0, QString("%1 objects (%2 bytes)").arg(pool.size()).arg(binary.size()) });
 				for (std::uint16_t i = 0; i < pool.size(); ++i)
 				{
@@ -495,6 +601,363 @@ namespace agisotc
 			}
 		}
 		ddop.setRows(rows);
+	}
+
+	void TcBridge::clearImplementModel()
+	{
+		currentImplementName = "No implement DDOP";
+		currentImplementGeometryStatus = "Waiting for an implement object pool";
+		implementElementStates.clear();
+		implementDdiStates.clear();
+		currentImplementElements.clear();
+		currentImplementDdis.clear();
+		currentTcBasicData.clear();
+		nextDdiSyncIndex = 0;
+		lastDdiSyncMs = 0;
+		emit implementChanged();
+		emit implementDdisChanged();
+	}
+
+	void TcBridge::buildImplementModel(isobus::DeviceDescriptorObjectPool &pool)
+	{
+		using namespace isobus::task_controller_object;
+		using DDI = isobus::DataDescriptionIndex;
+		int explicitGeometryCount = 0;
+
+		for (std::uint16_t i = 0; i < pool.size(); ++i)
+		{
+			auto object = pool.get_object_by_index(i);
+			if (auto *device = dynamic_cast<DeviceObject *>(object.get()))
+			{
+				currentImplementName = QString::fromStdString(device->get_designator()).trimmed();
+				if (currentImplementName.isEmpty()) currentImplementName = "ISOBUS implement";
+			}
+			else if (auto *element = dynamic_cast<DeviceElementObject *>(object.get()))
+			{
+				ImplementElementState state;
+				state.objectId = element->get_object_id();
+				state.element = element->get_element_number();
+				state.parentObjectId = element->get_parent_object();
+				state.type = static_cast<int>(element->get_type());
+				state.name = QString::fromStdString(element->get_designator()).trimmed();
+				if (state.name.isEmpty()) state.name = QString("Element %1").arg(state.element);
+				implementElementStates.push_back(state);
+			}
+		}
+
+		auto geometryKindForDdi = [](std::uint16_t ddi) -> int {
+			if (ddi == static_cast<std::uint16_t>(DDI::DeviceElementOffsetX)) return 1;
+			if (ddi == static_cast<std::uint16_t>(DDI::DeviceElementOffsetY)) return 2;
+			if (ddi == static_cast<std::uint16_t>(DDI::DeviceElementOffsetZ)) return 3;
+			if ((ddi == static_cast<std::uint16_t>(DDI::PhysicalObjectWidth)) ||
+			    (ddi == static_cast<std::uint16_t>(DDI::ActualWorkingWidth)) ||
+			    (ddi == static_cast<std::uint16_t>(DDI::DefaultWorkingWidth)) ||
+			    (ddi == static_cast<std::uint16_t>(DDI::SetpointWorkingWidth))) return 4;
+			if ((ddi == static_cast<std::uint16_t>(DDI::PhysicalObjectLength)) ||
+			    (ddi == static_cast<std::uint16_t>(DDI::ActualWorkingLength)) ||
+			    (ddi == static_cast<std::uint16_t>(DDI::SetpointWorkingLength))) return 5;
+			if (ddi == static_cast<std::uint16_t>(DDI::PhysicalObjectHeight)) return 6;
+			return 0;
+		};
+
+		for (auto &elementState : implementElementStates)
+		{
+			auto object = pool.get_object_by_id(elementState.objectId);
+			auto *element = dynamic_cast<DeviceElementObject *>(object.get());
+			if (nullptr == element) continue;
+			for (const auto childId : element->get_child_object_ids())
+			{
+				auto child = pool.get_object_by_id(childId);
+				if (auto *property = dynamic_cast<DevicePropertyObject *>(child.get()))
+				{
+					const int kind = geometryKindForDdi(property->get_ddi());
+					if (0 == kind) continue;
+					const double metres = geometry_value_metres(pool, property->get_value(), property->get_device_value_presentation_object_id());
+					switch (kind)
+					{
+						case 1: elementState.localX = metres; break;
+						case 2: elementState.localY = metres; break;
+						case 3: elementState.localZ = metres; break;
+						case 4: elementState.width = std::abs(metres); break;
+						case 5: elementState.length = std::abs(metres); break;
+						case 6: elementState.height = std::abs(metres); break;
+					}
+					elementState.hasGeometry = true;
+					++explicitGeometryCount;
+				}
+				else if (auto *processData = dynamic_cast<DeviceProcessDataObject *>(child.get()))
+				{
+					ImplementDdiState state;
+					state.ddi = processData->get_ddi();
+					state.element = elementState.element;
+					state.triggers = processData->get_trigger_methods_bitfield();
+					state.settable = processData->has_property(DeviceProcessDataObject::PropertiesBit::Settable);
+					state.name = QString::fromStdString(processData->get_designator()).trimmed();
+					const auto presentationId = processData->get_device_value_presentation_object_id();
+					if (isobus::NULL_OBJECT_ID != presentationId)
+					{
+						auto presentationObject = pool.get_object_by_id(presentationId);
+						if (auto *presentation = dynamic_cast<DeviceValuePresentationObject *>(presentationObject.get()))
+						{
+							state.displayOffset = presentation->get_offset();
+							state.displayScale = presentation->get_scale();
+							state.unit = QString::fromStdString(presentation->get_designator()).trimmed();
+						}
+					}
+					state.geometryKind = geometryKindForDdi(state.ddi);
+					if (0 != state.geometryKind)
+					{
+						state.geometryOffset = geometry_value_metres(pool, 0, processData->get_device_value_presentation_object_id());
+						state.geometryScale = geometry_value_metres(pool, 1, processData->get_device_value_presentation_object_id()) - state.geometryOffset;
+					}
+					implementDdiStates.push_back(state);
+				}
+			}
+		}
+
+		// Keep the visualization useful for DDOPs that omit optional physical dimensions.
+		for (auto &element : implementElementStates)
+		{
+			if (element.width <= 0.0) element.width = (element.type == static_cast<int>(DeviceElementObject::Type::Section)) ? 1.0 : 1.4;
+			if (element.length <= 0.0) element.length = (element.type == static_cast<int>(DeviceElementObject::Type::Connector)) ? 0.35 : 0.8;
+			if (element.height <= 0.0) element.height = (element.type == static_cast<int>(DeviceElementObject::Type::Bin)) ? 1.5 : 0.35;
+		}
+		std::vector<ImplementElementState *> sectionsWithoutGeometry;
+		for (auto &element : implementElementStates)
+		{
+			if ((element.type == static_cast<int>(DeviceElementObject::Type::Section)) && !element.hasGeometry)
+			{
+				sectionsWithoutGeometry.push_back(&element);
+			}
+		}
+		for (std::size_t i = 0; i < sectionsWithoutGeometry.size(); ++i)
+		{
+			sectionsWithoutGeometry[i]->localY = (static_cast<double>(i) - (static_cast<double>(sectionsWithoutGeometry.size() - 1) / 2.0)) * 1.05;
+		}
+		const int ddopSectionCount = static_cast<int>(std::count_if(implementElementStates.cbegin(), implementElementStates.cend(),
+		  [](const ImplementElementState &element) {
+			  return element.type == static_cast<int>(isobus::task_controller_object::DeviceElementObject::Type::Section);
+		  }));
+		if ((ddopSectionCount > 0) && (currentSectionCount != ddopSectionCount))
+		{
+			currentSectionCount = ddopSectionCount;
+			currentSectionStates = QVariantList(currentSectionCount, QVariant(false));
+			emit sectionCountChanged();
+			emit sectionStatesChanged();
+		}
+
+		currentImplementGeometryStatus = explicitGeometryCount > 0
+		  ? QString("DDOP geometry: %1 dimensions/offsets, %2 elements").arg(explicitGeometryCount).arg(implementElementStates.size())
+		  : QString("%1 DDOP elements; optional geometry is absent, using a compact fallback layout").arg(implementElementStates.size());
+		publishImplementModel();
+	}
+
+	void TcBridge::publishImplementModel()
+	{
+		QVariantList elements;
+		std::map<std::uint16_t, const ImplementElementState *> byObject;
+		for (const auto &element : implementElementStates) byObject[element.objectId] = &element;
+		auto absolutePosition = [&byObject](const ImplementElementState &element) {
+			std::array<double, 3> position = { element.localX, element.localY, element.localZ };
+			std::uint16_t parent = element.parentObjectId;
+			for (int depth = 0; depth < 16; ++depth)
+			{
+				auto found = byObject.find(parent);
+				if (found == byObject.end()) break;
+				position[0] += found->second->localX;
+				position[1] += found->second->localY;
+				position[2] += found->second->localZ;
+				parent = found->second->parentObjectId;
+			}
+			return position;
+		};
+		std::array<double, 3> connectorPosition = { 0.0, 0.0, 0.0 };
+		for (const auto &element : implementElementStates)
+		{
+			if (element.type == static_cast<int>(isobus::task_controller_object::DeviceElementObject::Type::Connector))
+			{
+				connectorPosition = absolutePosition(element);
+				break;
+			}
+		}
+
+		for (const auto &element : implementElementStates)
+		{
+			const auto position = absolutePosition(element);
+			QVariantMap row;
+			row["objectId"] = element.objectId;
+			row["element"] = element.element;
+			row["name"] = element.name;
+			row["type"] = element.type;
+			// ISO: X longitudinal, Y lateral, Z vertical. Scene: X lateral, Z rearward.
+			row["x"] = -(position[1] - connectorPosition[1]);
+			row["y"] = position[2] - connectorPosition[2];
+			row["z"] = -(position[0] - connectorPosition[0]);
+			row["width"] = element.width;
+			row["length"] = element.length;
+			row["height"] = element.height;
+			row["active"] = element.active;
+			row["hasGeometry"] = element.hasGeometry;
+			elements.push_back(row);
+		}
+		currentImplementElements = elements;
+
+		QVariantList ddis;
+		QVariantList basicData;
+		for (const auto &state : implementDdiStates)
+		{
+			QVariantMap row;
+			row["ddi"] = state.ddi;
+			row["element"] = state.element;
+			row["name"] = state.name;
+			row["settable"] = state.settable;
+			row["triggers"] = trigger_text(state.triggers);
+			row["hasValue"] = state.hasValue;
+			row["value"] = state.value;
+			row["updated"] = state.updated;
+			row["displayValue"] = (static_cast<double>(state.value) + state.displayOffset) * state.displayScale;
+			row["unit"] = state.unit;
+			ddis.push_back(row);
+			const QString basicLabel = tc_basic_label(state.ddi);
+			if (!basicLabel.isEmpty())
+			{
+				QVariantMap basic = row;
+				basic["label"] = basicLabel;
+				basicData.push_back(basic);
+			}
+		}
+		currentImplementDdis = ddis;
+		currentTcBasicData = basicData;
+
+		std::vector<const ImplementElementState *> sections;
+		for (const auto &element : implementElementStates)
+		{
+			if (element.type == static_cast<int>(isobus::task_controller_object::DeviceElementObject::Type::Section)) sections.push_back(&element);
+		}
+		std::sort(sections.begin(), sections.end(), [](const auto *left, const auto *right) { return left->element < right->element; });
+		if (!sections.empty())
+		{
+			currentSectionStates.clear();
+			for (const auto *section : sections) currentSectionStates.push_back(section->active);
+			emit sectionStatesChanged();
+		}
+		emit implementChanged();
+		emit implementDdisChanged();
+	}
+
+	void TcBridge::updateImplementValue(std::uint16_t ddi, std::uint16_t element, std::int32_t value)
+	{
+		using DDI = isobus::DataDescriptionIndex;
+		bool changed = false;
+		for (auto &state : implementDdiStates)
+		{
+			if ((state.ddi != ddi) || (state.element != element)) continue;
+			state.value = value;
+			state.hasValue = true;
+			state.updated = timestamp_now();
+			if (0 != state.geometryKind)
+			{
+				const double metres = state.geometryOffset + (static_cast<double>(value) * state.geometryScale);
+				for (auto &geometry : implementElementStates)
+				{
+					if (geometry.element != element) continue;
+					switch (state.geometryKind)
+					{
+						case 1: geometry.localX = metres; break;
+						case 2: geometry.localY = metres; break;
+						case 3: geometry.localZ = metres; break;
+						case 4: geometry.width = std::abs(metres); break;
+						case 5: geometry.length = std::abs(metres); break;
+						case 6: geometry.height = std::abs(metres); break;
+					}
+					geometry.hasGeometry = true;
+				}
+			}
+			changed = true;
+		}
+
+		if (ddi == static_cast<std::uint16_t>(DDI::ActualWorkState))
+		{
+			for (auto &geometry : implementElementStates)
+			{
+				if (geometry.element == element) geometry.active = ((value & 0x03) == 1);
+			}
+			changed = true;
+		}
+		const auto firstCondensed = static_cast<std::uint16_t>(DDI::ActualCondensedWorkState1_16);
+		const auto lastCondensed = static_cast<std::uint16_t>(DDI::ActualCondensedWorkState241_256);
+		if ((ddi >= firstCondensed) && (ddi <= lastCondensed))
+		{
+			std::vector<ImplementElementState *> sections;
+			for (auto &geometry : implementElementStates)
+			{
+				if (geometry.type == static_cast<int>(isobus::task_controller_object::DeviceElementObject::Type::Section)) sections.push_back(&geometry);
+			}
+			std::sort(sections.begin(), sections.end(), [](const auto *left, const auto *right) { return left->element < right->element; });
+			const std::size_t base = static_cast<std::size_t>(ddi - firstCondensed) * 16;
+			for (std::size_t i = 0; (i < 16) && ((base + i) < sections.size()); ++i)
+			{
+				sections[base + i]->active = (((static_cast<std::uint32_t>(value) >> (i * 2)) & 0x03U) == 1U);
+			}
+			changed = true;
+		}
+		if (changed) publishImplementModel();
+	}
+
+	void TcBridge::setAutoDdiSync(bool enabled)
+	{
+		if (autoDdiSyncEnabled == enabled) return;
+		autoDdiSyncEnabled = enabled;
+		lastDdiSyncMs = 0;
+		emit autoDdiSyncChanged();
+	}
+
+	void TcBridge::setDdiSyncIntervalMs(int intervalMs)
+	{
+		intervalMs = qBound(250, intervalMs, 60000);
+		if (currentDdiSyncIntervalMs == intervalMs) return;
+		currentDdiSyncIntervalMs = intervalMs;
+		lastDdiSyncMs = 0;
+		emit autoDdiSyncChanged();
+	}
+
+	void TcBridge::requestImplementDdis()
+	{
+		if (!running || (nullptr == server) || (currentSelectedClient < 0) || implementDdiStates.empty()) return;
+		auto client = server->find_client(static_cast<std::uint8_t>(currentSelectedClient));
+		if (nullptr == client) return;
+		int sentCount = 0;
+		for (const auto &state : implementDdiStates)
+		{
+			if (server->send_request_value(client, state.ddi, state.element)) ++sentCount;
+		}
+		logs.addLine(QString("[ddop] Requested %1/%2 declared process values from %3.")
+		               .arg(sentCount).arg(implementDdiStates.size()).arg(currentImplementName));
+		lastDdiSyncMs = steady_clock_ms();
+	}
+
+	void TcBridge::serviceDdiSync()
+	{
+		if (!autoDdiSyncEnabled || implementDdiStates.empty() || (currentSelectedClient < 0)) return;
+		const auto now = steady_clock_ms();
+		if ((lastDdiSyncMs != 0) && ((now - lastDdiSyncMs) < static_cast<std::uint64_t>(currentDdiSyncIntervalMs))) return;
+		auto client = server->find_client(static_cast<std::uint8_t>(currentSelectedClient));
+		if (nullptr == client) return;
+
+		using Trigger = isobus::task_controller_object::DeviceProcessDataObject::AvailableTriggerMethods;
+		const std::size_t batch = std::min<std::size_t>(4, implementDdiStates.size());
+		for (std::size_t count = 0; count < batch; ++count)
+		{
+			auto &state = implementDdiStates[nextDdiSyncIndex % implementDdiStates.size()];
+			if (!state.reportingConfigured && (state.triggers & static_cast<std::uint8_t>(Trigger::TimeInterval)))
+			{
+				state.reportingConfigured = server->send_time_interval_measurement_command(
+				  client, state.ddi, state.element, static_cast<std::uint32_t>(currentDdiSyncIntervalMs));
+			}
+			server->send_request_value(client, state.ddi, state.element);
+			++nextDdiSyncIndex;
+		}
+		lastDdiSyncMs = now;
 	}
 
 	void TcBridge::selectClient(int address)
@@ -704,6 +1167,8 @@ namespace agisotc
 			}
 		}
 		gpsRunningFlag = true;
+		lastMotionUpdateMs = 0;
+		trailerPoseValid = false;
 		setStatus(QString("GPS started: %1.").arg(source));
 		logs.addLine(QString("[gps] Source started: %1.").arg(source));
 		emit gpsChanged();
@@ -720,6 +1185,7 @@ namespace agisotc
 		gpsRunningFlag = false;
 		currentGps.valid = false;
 		currentGpsSourceText = "Off";
+		lastMotionUpdateMs = 0;
 		logs.addLine("[gps] Source stopped.");
 		emit gpsChanged();
 	}
@@ -731,7 +1197,10 @@ namespace agisotc
 			setStatus("Start simulated GPS before changing its motion.");
 			return;
 		}
-		gpsProvider.set_simulation_motion(std::max(0.0, speedKph) / 3.6, courseDeg);
+		currentThrottleKph = std::clamp(speedKph, 0.0, 50.0);
+		currentSteeringAngle = 0.0;
+		gpsProvider.set_simulation_motion(currentThrottleKph / 3.6, courseDeg);
+		emit drivingControlsChanged();
 	}
 
 	void TcBridge::nudgeSimulation(double forwardMeters, double turnDegrees)
@@ -927,11 +1396,200 @@ namespace agisotc
 		emit trackChanged();
 	}
 
+	bool TcBridge::startBoundaryRecording(const QString &name)
+	{
+		if (!currentGps.valid || !currentGps.latitudeDeg || !currentGps.longitudeDeg)
+		{
+			setStatus("Start GPS and wait for a valid position before recording a boundary.");
+			return false;
+		}
+		if (name.trimmed().isEmpty())
+		{
+			setStatus("Enter a field name before recording its boundary.");
+			return false;
+		}
+		recordedBoundaryName = name.trimmed();
+		recordedBoundary.clear();
+		recordedBoundary.emplace_back(*currentGps.latitudeDeg, *currentGps.longitudeDeg);
+		boundaryRecordingFlag = true;
+		fieldOriginLatitude = *currentGps.latitudeDeg;
+		fieldOriginLongitude = *currentGps.longitudeDeg;
+		fieldOriginValid = true;
+		rebuildFieldBoundaryPoints();
+		emit boundaryChanged();
+		setStatus(QString("Recording perimeter for '%1'. Drive around the field and finish near the start.").arg(recordedBoundaryName));
+		return true;
+	}
+
+	bool TcBridge::finishBoundaryRecording()
+	{
+		if (!boundaryRecordingFlag || (recordedBoundary.size() < 3))
+		{
+			setStatus("At least three perimeter points are required.");
+			return false;
+		}
+		if (recordedBoundary.front() != recordedBoundary.back()) recordedBoundary.push_back(recordedBoundary.front());
+		FieldBoundary field;
+		field.name = recordedBoundaryName.toStdString();
+		field.exteriorRing = recordedBoundary;
+		const auto fieldId = fieldTaskManager.add_field(field);
+		if (fieldId.empty())
+		{
+			setStatus("The recorded field boundary could not be saved.");
+			return false;
+		}
+		boundaryRecordingFlag = false;
+		refreshFieldNames();
+		const auto selected = std::find(fieldIds.begin(), fieldIds.end(), fieldId);
+		selectField(static_cast<int>(std::distance(fieldIds.begin(), selected)));
+		recordedBoundary.clear();
+		emit boundaryChanged();
+		setStatus(QString("Field '%1' saved from %2 perimeter points.").arg(recordedBoundaryName).arg(field.exteriorRing.size() - 1));
+		logs.addLine(QString("[field] Recorded perimeter for %1.").arg(recordedBoundaryName));
+		return true;
+	}
+
+	void TcBridge::cancelBoundaryRecording()
+	{
+		boundaryRecordingFlag = false;
+		recordedBoundary.clear();
+		rebuildFieldBoundaryPoints();
+		emit boundaryChanged();
+		setStatus("Field perimeter recording cancelled.");
+	}
+
+	void TcBridge::setSteeringAngle(double degrees)
+	{
+		degrees = std::clamp(degrees, -40.0, 40.0);
+		if (std::abs(currentSteeringAngle - degrees) < 0.05) return;
+		currentSteeringAngle = degrees;
+		emit drivingControlsChanged();
+	}
+
+	void TcBridge::setThrottleKph(double speedKph)
+	{
+		speedKph = std::clamp(speedKph, 0.0, 50.0);
+		if (std::abs(currentThrottleKph - speedKph) < 0.01) return;
+		currentThrottleKph = speedKph;
+		if (gpsRunningFlag && (currentGpsSourceText == "Simulated"))
+		{
+			gpsProvider.set_simulation_motion(currentThrottleKph / 3.6, currentGps.courseDeg.value_or(0.0));
+		}
+		emit drivingControlsChanged();
+	}
+
+	void TcBridge::adjustThrottle(double deltaKph) { setThrottleKph(currentThrottleKph + deltaKph); }
+
+	void TcBridge::stopTractor()
+	{
+		setThrottleKph(0.0);
+		setStatus("Tractor stopped.");
+	}
+
+	void TcBridge::clearWorkedArea()
+	{
+		currentWorkedPoints.clear();
+		currentWorkedAreaHa = 0.0;
+		currentWorkedDistanceM = 0.0;
+		currentWorkedTimeSeconds = 0.0;
+		coveragePositionValid = false;
+		emit workChanged();
+	}
+
+	void TcBridge::rebuildFieldBoundaryPoints()
+	{
+		currentFieldBoundaryPoints.clear();
+		std::vector<std::pair<double, double>> points;
+		if (boundaryRecordingFlag)
+		{
+			points = recordedBoundary;
+		}
+		else if ((currentSelectedField >= 0) && (currentSelectedField < static_cast<int>(fieldIds.size())))
+		{
+			const auto field = fieldTaskManager.get_field(fieldIds[static_cast<std::size_t>(currentSelectedField)]);
+			if (field) points = field->exteriorRing;
+		}
+		if (!fieldOriginValid) return;
+		for (const auto &[latitude, longitude] : points)
+		{
+			QVariantMap point;
+			point["x"] = (longitude - fieldOriginLongitude) * DegreesToRadians * EarthRadiusM * std::cos(fieldOriginLatitude * DegreesToRadians);
+			point["z"] = -(latitude - fieldOriginLatitude) * DegreesToRadians * EarthRadiusM;
+			currentFieldBoundaryPoints.push_back(point);
+		}
+		emit boundaryChanged();
+	}
+
+	void TcBridge::updateTrailerPose(double elapsedSeconds)
+	{
+		const double tractorCourse = currentGps.courseDeg.value_or(0.0);
+		if (!trailerPoseValid)
+		{
+			currentImplementCourse = tractorCourse;
+			trailerPoseValid = true;
+		}
+		const double difference = std::remainder(tractorCourse - currentImplementCourse, 360.0);
+		const double speedMps = currentGps.speedMps.value_or(0.0);
+		const double yawRateDeg = (speedMps / 4.5) * std::sin(difference * DegreesToRadians) / DegreesToRadians;
+		currentImplementCourse = std::fmod(currentImplementCourse + (yawRateDeg * elapsedSeconds) + 360.0, 360.0);
+		const double heading = tractorCourse * DegreesToRadians;
+		currentImplementX = currentTractorX - (std::sin(heading) * 2.8);
+		currentImplementZ = currentTractorZ + (std::cos(heading) * 2.8);
+	}
+
+	void TcBridge::updateWorkCoverage(double elapsedSeconds)
+	{
+		const double distance = coveragePositionValid ? std::hypot(currentImplementX - lastCoverageX, currentImplementZ - lastCoverageZ) : 0.0;
+		lastCoverageX = currentImplementX;
+		lastCoverageZ = currentImplementZ;
+		coveragePositionValid = true;
+		if (!taskActive || (activeSectionCount() == 0) || (distance > 10.0)) return;
+		double activeWidth = 0.0;
+		for (const auto &element : implementElementStates)
+		{
+			if ((element.type == static_cast<int>(isobus::task_controller_object::DeviceElementObject::Type::Section)) && element.active)
+			{
+				activeWidth += element.width;
+			}
+		}
+		if (activeWidth <= 0.0) activeWidth = static_cast<double>(activeSectionCount());
+		currentWorkedDistanceM += distance;
+		currentWorkedAreaHa += (distance * activeWidth) / 10000.0;
+		currentWorkedTimeSeconds += elapsedSeconds;
+		bool appendCoverage = currentWorkedPoints.isEmpty();
+		if (!appendCoverage)
+		{
+			const QVariantMap last = currentWorkedPoints.constLast().toMap();
+			appendCoverage = std::hypot(currentImplementX - last.value("x").toDouble(),
+			                                currentImplementZ - last.value("z").toDouble()) >= 0.4;
+		}
+		if (appendCoverage && (currentWorkedPoints.size() < 3000))
+		{
+			QVariantMap point;
+			point["x"] = currentImplementX;
+			point["z"] = currentImplementZ;
+			point["width"] = activeWidth;
+			point["course"] = currentImplementCourse;
+			currentWorkedPoints.push_back(point);
+		}
+		emit workChanged();
+	}
+
 	void TcBridge::updateGps()
 	{
 		if (!gpsRunningFlag)
 		{
 			return;
+		}
+		const auto nowMs = steady_clock_ms();
+		const double elapsedSeconds = (lastMotionUpdateMs == 0) ? 0.0 : std::min(0.5, static_cast<double>(nowMs - lastMotionUpdateMs) / 1000.0);
+		lastMotionUpdateMs = nowMs;
+		if ((currentGpsSourceText == "Simulated") && (elapsedSeconds > 0.0))
+		{
+			const double currentCourse = currentGps.courseDeg.value_or(0.0);
+			const double yawRate = (currentThrottleKph / 3.6 / 3.0) * std::tan(currentSteeringAngle * DegreesToRadians);
+			const double nextCourse = currentCourse + ((yawRate * elapsedSeconds) / DegreesToRadians);
+			gpsProvider.set_simulation_motion(currentThrottleKph / 3.6, nextCourse);
 		}
 		gpsProvider.update();
 		const GpsSolution solution = gpsProvider.current_solution();
@@ -955,6 +1613,7 @@ namespace agisotc
 		                  std::cos(fieldOriginLatitude * DegreesToRadians);
 		const double north = (*solution.latitudeDeg - fieldOriginLatitude) * DegreesToRadians * EarthRadiusM;
 		currentTractorZ = -north;
+		updateTrailerPose(elapsedSeconds);
 
 		bool appendPoint = currentTrackPoints.isEmpty();
 		if (!appendPoint)
@@ -975,6 +1634,24 @@ namespace agisotc
 			}
 			emit trackChanged();
 		}
+		if (boundaryRecordingFlag)
+		{
+			bool appendBoundary = recordedBoundary.empty();
+			if (!appendBoundary)
+			{
+				const auto &[lastLatitude, lastLongitude] = recordedBoundary.back();
+				const double dx = (*solution.longitudeDeg - lastLongitude) * DegreesToRadians * EarthRadiusM *
+				                  std::cos(*solution.latitudeDeg * DegreesToRadians);
+				const double dz = (*solution.latitudeDeg - lastLatitude) * DegreesToRadians * EarthRadiusM;
+				appendBoundary = std::hypot(dx, dz) >= 1.0;
+			}
+			if (appendBoundary)
+			{
+				recordedBoundary.emplace_back(*solution.latitudeDeg, *solution.longitudeDeg);
+				rebuildFieldBoundaryPoints();
+			}
+		}
+		updateWorkCoverage(elapsedSeconds);
 		fieldTaskManager.on_position_update(solution);
 		emit gpsChanged();
 	}
@@ -1055,6 +1732,7 @@ namespace agisotc
 		currentFieldLengthM = maximumNorth - minimumNorth;
 		currentActiveFieldName = QString::fromStdString(field->name);
 		clearTrack();
+		rebuildFieldBoundaryPoints();
 	}
 
 	void TcBridge::registerGpsCanCallbacks()

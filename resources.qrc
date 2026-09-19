@@ -9,5 +9,6 @@
     <file>qml/SectionView3D.qml</file>
     <file>qml/OperationsPanel.qml</file>
     <file>qml/LogPanel.qml</file>
+    <file alias="icons/logo.ico">doc/logo.ico</file>
   </qresource>
 </RCC>

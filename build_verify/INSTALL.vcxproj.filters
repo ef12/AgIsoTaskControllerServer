@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\CMakeFiles\26d541cf4aa8e188c5da946153923841\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{9F22F56A-8B0C-3014-976A-FF24EFCA5B7E}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

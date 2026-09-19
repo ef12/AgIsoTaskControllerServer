@@ -1,0 +1,303 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{948BFFDD-1872-3170-A19B-260DF276E631}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>can_stack-populate</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-mkdir.rule">
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Creating directories for 'can_stack-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -Dcfgdir=/Debug -P C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/tmp/can_stack-populate-mkdirs.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-mkdir
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-mkdir</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-download.rule">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Performing download step (git clone) for 'can_stack-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/tmp/can_stack-populate-gitclone.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-download
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\can_stack-populate-gitinfo.txt;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-mkdir;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-download</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-update.rule">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Performing update step for 'can_stack-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -Dcan_fetch=YES -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/tmp/can_stack-populate-gitupdate.cmake
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\tmp\can_stack-populate-gitupdate.cmake;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\can_stack-populate-update-info.txt;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-download;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-update</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</VerifyInputsAndOutputsExist>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-patch.rule">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">No patch step for 'can_stack-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-patch
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\can_stack-populate-patch-info.txt;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-update;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-patch</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</VerifyInputsAndOutputsExist>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-configure.rule">
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">No configure step for 'can_stack-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-build
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-configure
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\tmp\can_stack-populate-cfgcmd.txt;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-patch;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-configure</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-build.rule">
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">No build step for 'can_stack-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-build
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-build
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-configure;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-build</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-install.rule">
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">No install step for 'can_stack-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-build
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-install
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-build;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-install</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-test.rule">
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">No test step for 'can_stack-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-build
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-test
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-install;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-test</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\072f7781643f3c19334ad5ac3e846610\can_stack-populate-complete.rule">
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Completed 'can_stack-populate'</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/CMakeFiles/Debug
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/CMakeFiles/Debug/can_stack-populate-complete
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-done
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-install;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-mkdir;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-download;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-update;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-patch;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-configure;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-build;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\src\can_stack-populate-stamp\Debug\can_stack-populate-test;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\Debug\can_stack-populate-complete</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</VerifyInputsAndOutputsExist>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\2086694f44e047830ea2016349f908fa\can_stack-populate.rule">
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'"></Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\Debug\can_stack-populate-complete;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\can_stack-populate</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</VerifyInputsAndOutputsExist>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild -BC:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild --check-stamp-file C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeDetermineSystem.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeGenericSystem.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeInitializeConfigs.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeSystem.cmake.in;C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeSystemSpecificInformation.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\CMakeSystemSpecificInitialize.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\PatchInfo.txt.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\RepositoryInfo.txt.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\UpdateInfo.txt.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\cfgcmd.txt.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\gitclone.cmake.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\gitupdate.cmake.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\mkdirs.cmake.in;C:\Program Files\CMake\share\cmake-4.4\Modules\ExternalProject\shared_internal_commands.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\Platform\Windows-Initialize.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\Platform\Windows.cmake;C:\Program Files\CMake\share\cmake-4.4\Modules\Platform\WindowsPaths.cmake;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\4.4.3\CMakeSystem.cmake;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\can_stack-populate-prefix\tmp\can_stack-populate-mkdirs.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\can_stack-populate">
+    </None>
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\ZERO_CHECK.vcxproj">
+      <Project>{29AA7639-78FE-3418-BC8F-70CC4F905BF3}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

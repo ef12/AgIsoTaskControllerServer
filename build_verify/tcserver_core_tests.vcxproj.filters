@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\tests\core_workflow_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{35E717EC-C50A-3F41-A185-D4838D056743}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

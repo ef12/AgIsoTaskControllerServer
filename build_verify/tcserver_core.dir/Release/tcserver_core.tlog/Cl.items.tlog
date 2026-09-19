@@ -1,0 +1,6 @@
+C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\src\core\TcServerCore.cpp;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\tcserver_core.dir\Release\TcServerCore.obj
+C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\src\core\CanBusManager.cpp;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\tcserver_core.dir\Release\CanBusManager.obj
+C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\src\core\GpsProvider.cpp;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\tcserver_core.dir\Release\GpsProvider.obj
+C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\src\core\FieldTaskManager.cpp;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\tcserver_core.dir\Release\FieldTaskManager.obj
+C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\src\core\NmeaParser.cpp;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\tcserver_core.dir\Release\NmeaParser.obj
+C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\src\core\IsoGpsHandler.cpp;C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\tcserver_core.dir\Release\IsoGpsHandler.obj

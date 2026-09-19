@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-mkdir.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-download.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-update.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-patch.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-configure.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-build.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-install.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\990bd0ae4e14954f132b9505a517c625\can_stack-populate-test.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\072f7781643f3c19334ad5ac3e846610\can_stack-populate-complete.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\2086694f44e047830ea2016349f908fa\can_stack-populate.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-subbuild\CMakeFiles\can_stack-populate" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{48BB14E5-8A40-398E-A770-EB85ED435AF4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

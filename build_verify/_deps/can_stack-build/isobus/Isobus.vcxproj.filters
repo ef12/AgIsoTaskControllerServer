@@ -1,0 +1,291 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_NAME.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_identifier.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_control_function.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_message.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_network_manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_internal_control_function.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_partnered_control_function.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_NAME_filter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_transport_protocol.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_transport_protocol_base.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_stack_logger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_network_configuration.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_callbacks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_message_frame.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_virtual_terminal_client.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_extended_transport_protocol.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_diagnostic_protocol.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_parameter_group_number_request_protocol.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\nmea2000_fast_packet_protocol.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_data_dictionary.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_language_command_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_time_date_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_task_controller_client_objects.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_task_controller_client.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_device_descriptor_object_pool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_shortcut_button_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_functionalities.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_guidance_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_speed_distance_messages.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_maintain_power_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_virtual_terminal_objects.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_virtual_terminal_client_state_tracker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_virtual_terminal_client_update_helper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_heartbeat.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_task_controller_server.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_task_controller_server_options.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\nmea2000_message_definitions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\nmea2000_message_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_device_descriptor_object_pool_helpers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\can_message_data.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_virtual_terminal_server.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_virtual_terminal_working_set_base.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\src\isobus_virtual_terminal_server_managed_working_set.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_NAME.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_badge.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_identifier.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_control_function.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_message.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_general_parameter_group_numbers.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_network_manager.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_NAME_filter.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_transport_protocol.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_transport_protocol_base.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_stack_logger.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_network_configuration.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_callbacks.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_message_frame.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_hardware_abstraction.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_internal_control_function.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_partnered_control_function.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_virtual_terminal_client.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_extended_transport_protocol.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_diagnostic_protocol.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_parameter_group_number_request_protocol.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\nmea2000_fast_packet_protocol.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_data_dictionary.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_virtual_terminal_objects.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_language_command_interface.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_time_date_interface.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_standard_data_description_indices.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_task_controller_client_objects.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_task_controller_client.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_device_descriptor_object_pool.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_shortcut_button_interface.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_functionalities.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_speed_distance_messages.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_maintain_power_interface.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_virtual_terminal_client_state_tracker.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_virtual_terminal_client_update_helper.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_heartbeat.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_task_controller_server.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_task_controller_server_options.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\nmea2000_message_definitions.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\nmea2000_message_interface.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_preferred_addresses.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_device_descriptor_object_pool_helpers.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\can_message_data.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_virtual_terminal_base.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_virtual_terminal_server.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_virtual_terminal_working_set_base.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\include\isobus\isobus\isobus_virtual_terminal_server_managed_working_set.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\isobus\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{9352DA86-C2C4-3833-8B99-2D7CFFFCAA3D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{35E717EC-C50A-3F41-A185-D4838D056743}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,60 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\src\system_timing.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\src\processing_flags.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\src\iop_file_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\src\platform_endianness.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\src\chrono_time_source.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\include\isobus\utility\system_timing.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\include\isobus\utility\chrono_time_source.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\include\isobus\utility\time_source.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\include\isobus\utility\processing_flags.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\include\isobus\utility\iop_file_interface.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\include\isobus\utility\to_string.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\include\isobus\utility\platform_endianness.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\include\isobus\utility\event_dispatcher.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\include\isobus\utility\thread_synchronization.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\_dependencies\AgIsoStack-plus-plus\utility\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{9352DA86-C2C4-3833-8B99-2D7CFFFCAA3D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{35E717EC-C50A-3F41-A185-D4838D056743}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

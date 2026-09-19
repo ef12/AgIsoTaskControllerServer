@@ -1,0 +1,10 @@
+^C:\USERS\GR_EFR\DOCUMENTS\PRV_SW_DEV\AGISOTASKCONTROLLERSERVER\_DEPENDENCIES\AGISOSTACK-PLUS-PLUS\ISOBUS\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer -BC:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify --check-stamp-file C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-build/isobus/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

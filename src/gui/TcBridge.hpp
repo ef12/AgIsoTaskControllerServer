@@ -10,6 +10,7 @@
 #include <atomic>
 #include <memory>
 #include <thread>
+#include <vector>
 
 #include <QObject>
 #include <QString>
@@ -26,6 +27,7 @@
 namespace isobus
 {
 	class CANMessage;
+	class DeviceDescriptorObjectPool;
 }
 
 namespace agisotc
@@ -50,6 +52,10 @@ namespace agisotc
 		Q_PROPERTY(double tractorX READ tractorX NOTIFY gpsChanged)
 		Q_PROPERTY(double tractorZ READ tractorZ NOTIFY gpsChanged)
 		Q_PROPERTY(QVariantList trackPoints READ trackPoints NOTIFY trackChanged)
+		Q_PROPERTY(QVariantList workedPoints READ workedPoints NOTIFY workChanged)
+		Q_PROPERTY(QVariantList fieldBoundaryPoints READ fieldBoundaryPoints NOTIFY boundaryChanged)
+		Q_PROPERTY(bool boundaryRecording READ boundaryRecording NOTIFY boundaryChanged)
+		Q_PROPERTY(int boundaryPointCount READ boundaryPointCount NOTIFY boundaryChanged)
 		Q_PROPERTY(QStringList fieldNames READ fieldNames NOTIFY fieldsChanged)
 		Q_PROPERTY(QStringList taskNames READ taskNames NOTIFY tasksChanged)
 		Q_PROPERTY(int selectedFieldIndex READ selectedFieldIndex NOTIFY fieldsChanged)
@@ -58,6 +64,22 @@ namespace agisotc
 		Q_PROPERTY(QString activeTaskName READ activeTaskName NOTIFY tasksChanged)
 		Q_PROPERTY(double fieldWidthM READ fieldWidthM NOTIFY fieldsChanged)
 		Q_PROPERTY(double fieldLengthM READ fieldLengthM NOTIFY fieldsChanged)
+		Q_PROPERTY(QString implementName READ implementName NOTIFY implementChanged)
+		Q_PROPERTY(QString implementGeometryStatus READ implementGeometryStatus NOTIFY implementChanged)
+		Q_PROPERTY(QVariantList implementElements READ implementElements NOTIFY implementChanged)
+		Q_PROPERTY(QVariantList implementDdis READ implementDdis NOTIFY implementDdisChanged)
+		Q_PROPERTY(bool autoDdiSync READ autoDdiSync NOTIFY autoDdiSyncChanged)
+		Q_PROPERTY(int ddiSyncIntervalMs READ ddiSyncIntervalMs NOTIFY autoDdiSyncChanged)
+		Q_PROPERTY(QVariantList tcBasicData READ tcBasicData NOTIFY implementDdisChanged)
+		Q_PROPERTY(int activeSectionCount READ activeSectionCount NOTIFY sectionStatesChanged)
+		Q_PROPERTY(double workedAreaHa READ workedAreaHa NOTIFY workChanged)
+		Q_PROPERTY(double workedDistanceM READ workedDistanceM NOTIFY workChanged)
+		Q_PROPERTY(double workedTimeSeconds READ workedTimeSeconds NOTIFY workChanged)
+		Q_PROPERTY(double steeringAngle READ steeringAngle NOTIFY drivingControlsChanged)
+		Q_PROPERTY(double throttleKph READ throttleKph NOTIFY drivingControlsChanged)
+		Q_PROPERTY(double implementX READ implementX NOTIFY gpsChanged)
+		Q_PROPERTY(double implementZ READ implementZ NOTIFY gpsChanged)
+		Q_PROPERTY(double implementCourse READ implementCourse NOTIFY gpsChanged)
 		Q_PROPERTY(ClientListModel *clientModel READ clientModel CONSTANT)
 		Q_PROPERTY(DdopModel *ddopModel READ ddopModel CONSTANT)
 		Q_PROPERTY(ProcessDataModel *valueModel READ valueModel CONSTANT)
@@ -95,6 +117,10 @@ namespace agisotc
 		double tractorX() const;
 		double tractorZ() const;
 		QVariantList trackPoints() const;
+		QVariantList workedPoints() const;
+		QVariantList fieldBoundaryPoints() const;
+		bool boundaryRecording() const;
+		int boundaryPointCount() const;
 		QStringList fieldNames() const;
 		QStringList taskNames() const;
 		int selectedFieldIndex() const;
@@ -103,6 +129,22 @@ namespace agisotc
 		QString activeTaskName() const;
 		double fieldWidthM() const;
 		double fieldLengthM() const;
+		QString implementName() const;
+		QString implementGeometryStatus() const;
+		QVariantList implementElements() const;
+		QVariantList implementDdis() const;
+		bool autoDdiSync() const;
+		int ddiSyncIntervalMs() const;
+		QVariantList tcBasicData() const;
+		int activeSectionCount() const;
+		double workedAreaHa() const;
+		double workedDistanceM() const;
+		double workedTimeSeconds() const;
+		double steeringAngle() const;
+		double throttleKph() const;
+		double implementX() const;
+		double implementZ() const;
+		double implementCourse() const;
 		ClientListModel *clientModel();
 		DdopModel *ddopModel();
 		ProcessDataModel *valueModel();
@@ -134,6 +176,17 @@ namespace agisotc
 		Q_INVOKABLE void pauseSelectedTask();
 		Q_INVOKABLE void stopSelectedTask();
 		Q_INVOKABLE void clearTrack();
+		Q_INVOKABLE void setAutoDdiSync(bool enabled);
+		Q_INVOKABLE void setDdiSyncIntervalMs(int intervalMs);
+		Q_INVOKABLE void requestImplementDdis();
+		Q_INVOKABLE bool startBoundaryRecording(const QString &name);
+		Q_INVOKABLE bool finishBoundaryRecording();
+		Q_INVOKABLE void cancelBoundaryRecording();
+		Q_INVOKABLE void setSteeringAngle(double degrees);
+		Q_INVOKABLE void setThrottleKph(double speedKph);
+		Q_INVOKABLE void adjustThrottle(double deltaKph);
+		Q_INVOKABLE void stopTractor();
+		Q_INVOKABLE void clearWorkedArea();
 
 	signals:
 		void runningChanged();
@@ -147,6 +200,12 @@ namespace agisotc
 		void trackChanged();
 		void fieldsChanged();
 		void tasksChanged();
+		void implementChanged();
+		void implementDdisChanged();
+		void autoDdiSyncChanged();
+		void boundaryChanged();
+		void workChanged();
+		void drivingControlsChanged();
 		void identifyBanner(int tcNumber);
 
 	private:
@@ -160,6 +219,14 @@ namespace agisotc
 		void refreshTaskNames();
 		void registerGpsCanCallbacks();
 		void unregisterGpsCanCallbacks();
+		void clearImplementModel();
+		void buildImplementModel(isobus::DeviceDescriptorObjectPool &pool);
+		void publishImplementModel();
+		void updateImplementValue(std::uint16_t ddi, std::uint16_t element, std::int32_t value);
+		void serviceDdiSync();
+		void updateTrailerPose(double elapsedSeconds);
+		void updateWorkCoverage(double elapsedSeconds);
+		void rebuildFieldBoundaryPoints();
 		static void processGpsCanMessage(const isobus::CANMessage &message, void *parentPointer);
 
 		CanBusManager canBus;
@@ -188,6 +255,11 @@ namespace agisotc
 		double currentTractorX = 0.0;
 		double currentTractorZ = 0.0;
 		QVariantList currentTrackPoints;
+		QVariantList currentWorkedPoints;
+		QVariantList currentFieldBoundaryPoints;
+		std::vector<std::pair<double, double>> recordedBoundary;
+		QString recordedBoundaryName;
+		bool boundaryRecordingFlag = false;
 		std::vector<std::string> fieldIds;
 		std::vector<std::string> taskIds;
 		QStringList currentFieldNames;
@@ -201,6 +273,67 @@ namespace agisotc
 		double fieldOriginLatitude = 0.0;
 		double fieldOriginLongitude = 0.0;
 		bool fieldOriginValid = false;
+
+		struct ImplementElementState
+		{
+			std::uint16_t objectId = 0;
+			std::uint16_t element = 0;
+			std::uint16_t parentObjectId = 0;
+			int type = 0;
+			QString name;
+			double localX = 0.0;
+			double localY = 0.0;
+			double localZ = 0.0;
+			double width = 0.0;
+			double length = 0.0;
+			double height = 0.0;
+			bool hasGeometry = false;
+			bool active = false;
+		};
+
+		struct ImplementDdiState
+		{
+			std::uint16_t ddi = 0;
+			std::uint16_t element = 0;
+			std::uint8_t triggers = 0;
+			bool settable = false;
+			QString name;
+			bool hasValue = false;
+			std::int32_t value = 0;
+			QString updated;
+			int geometryKind = 0; ///< 1/2/3 offset XYZ, 4/5/6 width/length/height.
+			double geometryOffset = 0.0;
+			double geometryScale = 0.001;
+			double displayOffset = 0.0;
+			double displayScale = 1.0;
+			QString unit;
+			bool reportingConfigured = false;
+		};
+
+		QString currentImplementName = "No implement DDOP";
+		QString currentImplementGeometryStatus = "Waiting for an implement object pool";
+		QVariantList currentImplementElements;
+		QVariantList currentImplementDdis;
+		std::vector<ImplementElementState> implementElementStates;
+		std::vector<ImplementDdiState> implementDdiStates;
+		bool autoDdiSyncEnabled = true;
+		int currentDdiSyncIntervalMs = 1000;
+		std::uint64_t lastDdiSyncMs = 0;
+		std::size_t nextDdiSyncIndex = 0;
+		QVariantList currentTcBasicData;
+		double currentWorkedAreaHa = 0.0;
+		double currentWorkedDistanceM = 0.0;
+		double currentWorkedTimeSeconds = 0.0;
+		double currentSteeringAngle = 0.0;
+		double currentThrottleKph = 0.0;
+		double currentImplementX = 0.0;
+		double currentImplementZ = 0.0;
+		double currentImplementCourse = 0.0;
+		std::uint64_t lastMotionUpdateMs = 0;
+		bool trailerPoseValid = false;
+		double lastCoverageX = 0.0;
+		double lastCoverageZ = 0.0;
+		bool coveragePositionValid = false;
 		std::vector<std::uint8_t> manualPool; ///< Manually loaded pool file for the selected client.
 		int manualPoolClient = -1;
 	};

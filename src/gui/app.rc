@@ -1,0 +1,2 @@
+// Windows executable icon.
+IDI_APP_ICON ICON "../../doc/logo.ico"

@@ -1,0 +1,150 @@
+^C:\USERS\GR_EFR\DOCUMENTS\PRV_SW_DEV\AGISOTASKCONTROLLERSERVER\BUILD_VERIFY\_DEPS\CAN_STACK-SUBBUILD\CMAKEFILES\990BD0AE4E14954F132B9505A517C625\CAN_STACK-POPULATE-MKDIR.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -Dcfgdir=/Debug -P C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/tmp/can_stack-populate-mkdirs.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-mkdir
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\GR_EFR\DOCUMENTS\PRV_SW_DEV\AGISOTASKCONTROLLERSERVER\BUILD_VERIFY\_DEPS\CAN_STACK-SUBBUILD\CMAKEFILES\990BD0AE4E14954F132B9505A517C625\CAN_STACK-POPULATE-DOWNLOAD.RULE
+setlocal
+cd C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/tmp/can_stack-populate-gitclone.cmake
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-download
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\GR_EFR\DOCUMENTS\PRV_SW_DEV\AGISOTASKCONTROLLERSERVER\BUILD_VERIFY\_DEPS\CAN_STACK-SUBBUILD\CMAKEFILES\990BD0AE4E14954F132B9505A517C625\CAN_STACK-POPULATE-UPDATE.RULE
+setlocal
+cd C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -Dcan_fetch=YES -DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE -P C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/tmp/can_stack-populate-gitupdate.cmake
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\GR_EFR\DOCUMENTS\PRV_SW_DEV\AGISOTASKCONTROLLERSERVER\BUILD_VERIFY\_DEPS\CAN_STACK-SUBBUILD\CMAKEFILES\990BD0AE4E14954F132B9505A517C625\CAN_STACK-POPULATE-PATCH.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-patch
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\GR_EFR\DOCUMENTS\PRV_SW_DEV\AGISOTASKCONTROLLERSERVER\BUILD_VERIFY\_DEPS\CAN_STACK-SUBBUILD\CMAKEFILES\990BD0AE4E14954F132B9505A517C625\CAN_STACK-POPULATE-CONFIGURE.RULE
+setlocal
+cd C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-build
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-configure
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\GR_EFR\DOCUMENTS\PRV_SW_DEV\AGISOTASKCONTROLLERSERVER\BUILD_VERIFY\_DEPS\CAN_STACK-SUBBUILD\CMAKEFILES\990BD0AE4E14954F132B9505A517C625\CAN_STACK-POPULATE-BUILD.RULE
+setlocal
+cd C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-build
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-build
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\GR_EFR\DOCUMENTS\PRV_SW_DEV\AGISOTASKCONTROLLERSERVER\BUILD_VERIFY\_DEPS\CAN_STACK-SUBBUILD\CMAKEFILES\990BD0AE4E14954F132B9505A517C625\CAN_STACK-POPULATE-INSTALL.RULE
+setlocal
+cd C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-build
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-install
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\GR_EFR\DOCUMENTS\PRV_SW_DEV\AGISOTASKCONTROLLERSERVER\BUILD_VERIFY\_DEPS\CAN_STACK-SUBBUILD\CMAKEFILES\990BD0AE4E14954F132B9505A517C625\CAN_STACK-POPULATE-TEST.RULE
+setlocal
+cd C:\Users\gr_efr\Documents\prv_sw_dev\AgIsoTaskControllerServer\build_verify\_deps\can_stack-build
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-test
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\GR_EFR\DOCUMENTS\PRV_SW_DEV\AGISOTASKCONTROLLERSERVER\BUILD_VERIFY\_DEPS\CAN_STACK-SUBBUILD\CMAKEFILES\072F7781643F3C19334AD5AC3E846610\CAN_STACK-POPULATE-COMPLETE.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/CMakeFiles/Debug
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/CMakeFiles/Debug/can_stack-populate-complete
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E touch C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/can_stack-populate-prefix/src/can_stack-populate-stamp/Debug/can_stack-populate-done
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\GR_EFR\DOCUMENTS\PRV_SW_DEV\AGISOTASKCONTROLLERSERVER\BUILD_VERIFY\_DEPS\CAN_STACK-SUBBUILD\CMAKEFILES\2086694F44E047830EA2016349F908FA\CAN_STACK-POPULATE.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\GR_EFR\DOCUMENTS\PRV_SW_DEV\AGISOTASKCONTROLLERSERVER\BUILD_VERIFY\_DEPS\CAN_STACK-SUBBUILD\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild -BC:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild --check-stamp-file C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/_deps/can_stack-subbuild/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
