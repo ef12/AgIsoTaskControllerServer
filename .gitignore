@@ -1,6 +1,9 @@
 build/
 build-*/
+build_verify/
 cmake-build-*/
+install/
+bin/
 _dependencies/
 *.user
 .vs/

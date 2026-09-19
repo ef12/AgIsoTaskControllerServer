@@ -1,9 +1,0 @@
--rootPath
-C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer
--cmake-output
--output-file
-C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify/.qt_plugins/Qt6_QmlPlugins_Imports_AgIsoTaskControllerServer.cmake
--importPath
-C:/Users/gr_efr/Documents/prv_sw_dev/AgIsoTaskControllerServer/build_verify
--importPath
-C:/Qt/6.5.3/msvc2019_64/./qml
