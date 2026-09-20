@@ -13,6 +13,7 @@
 #include "isobus/isobus/can_message.hpp"
 #include "isobus/isobus/can_network_manager.hpp"
 #include "isobus/isobus/isobus_device_descriptor_object_pool.hpp"
+#include "isobus/isobus/nmea2000_message_interface.hpp"
 #include "isobus/isobus/isobus_speed_distance_messages.hpp"
 #include "isobus/isobus/isobus_task_controller_client_objects.hpp"
 #include "isobus/isobus/isobus_standard_data_description_indices.hpp"
@@ -23,6 +24,28 @@ namespace agisotc
 	{
 		constexpr double EarthRadiusM = 6371000.0;
 		constexpr double DegreesToRadians = 3.14159265358979323846 / 180.0;
+
+		isobus::NMEA2000Messages::GNSSPositionData::GNSSMethod mapFixQualityToGnssMethod(const std::optional<FixQuality> &quality)
+		{
+			using GNSSMethod = isobus::NMEA2000Messages::GNSSPositionData::GNSSMethod;
+			if (!quality.has_value())
+			{
+				return GNSSMethod::NoGNSS;
+			}
+			switch (*quality)
+			{
+				case FixQuality::GpsFix:
+					return GNSSMethod::GNSSFix;
+				case FixQuality::DgpsFix:
+					return GNSSMethod::DGNSSFix;
+				case FixQuality::RtkFixed:
+					return GNSSMethod::RTKFixedInteger;
+				case FixQuality::RtkFloat:
+					return GNSSMethod::RTKFloat;
+				default:
+					return GNSSMethod::GNSSFix;
+			}
+		}
 		constexpr std::uint32_t GpsPositionPgn = 65267;
 		constexpr std::uint32_t GpsPositionDeltaPgn = 65268;
 		constexpr std::uint32_t GpsPositionDeltaHighPrecisionPgn = 65269;
@@ -374,6 +397,20 @@ namespace agisotc
 		currentMachineDistanceMm = 0;
 		speedMessages->initialize();
 
+		// Bridge our GPS (receiver or simulator) onto the bus as NMEA 2000
+		// so implements that listen for NMEA 2000 GPS get position, course,
+		// and speed: 129025 position rapid, 129026 COG/SOG, 129029 GNSS fix.
+		nmea2000 = std::make_unique<isobus::NMEA2000MessageInterface>(
+		  canBus.internal_control_function(),
+		  true,
+		  false,
+		  true,
+		  false,
+		  true,
+		  false,
+		  false);
+		nmea2000->initialize();
+
 		auto options = isobus::TaskControllerOptions()
 		                 .with_documentation()
 		                 .with_implement_section_control()
@@ -417,6 +454,7 @@ namespace agisotc
 			server.reset();
 		}
 		speedMessages.reset();
+		nmea2000.reset();
 		unregisterGpsCanCallbacks();
 		canBus.stop();
 		for (auto &state : implementDdiStates) state.reportingConfigured = false;
@@ -1853,7 +1891,56 @@ namespace agisotc
 		fieldTaskManager.on_position_update(solution);
 		emit gpsChanged();
 		updateSpeedMessages(elapsedSeconds);
+		updateNmea2000Gps();
 	}
+
+	void TcBridge::updateNmea2000Gps()
+	{
+		if (nullptr == nmea2000)
+		{
+			return;
+		}
+		if (currentGps.valid && currentGps.latitudeDeg.has_value() && currentGps.longitudeDeg.has_value())
+		{
+			const double latitude = *currentGps.latitudeDeg;
+			const double longitude = *currentGps.longitudeDeg;
+			const double speedMps = (currentGps.speedMps.has_value()) ? std::max(0.0, *currentGps.speedMps) : 0.0;
+			const bool haveCourse = currentGps.courseDeg.has_value();
+			const double courseRad = haveCourse ? (*currentGps.courseDeg * DegreesToRadians) : 0.0;
+
+			// PGN 129025 position rapid update (1e-7 degrees).
+			auto &position = nmea2000->get_position_rapid_update_transmit_message();
+			position.set_latitude(static_cast<std::int32_t>(latitude * 1e7));
+			position.set_longitude(static_cast<std::int32_t>(longitude * 1e7));
+
+			// PGN 129026 COG/SOG rapid update (1e-4 rad, 0.01 m/s).
+			auto &cogSog = nmea2000->get_cog_sog_transmit_message();
+			cogSog.set_course_over_ground(haveCourse ? static_cast<std::uint16_t>(std::fmod(courseRad, 2.0 * 3.14159265358979323846) * 1e4) : 0xFFFF);
+			cogSog.set_speed_over_ground(static_cast<std::uint16_t>(std::min<double>(0xFFFE, speedMps * 100.0)));
+			cogSog.set_course_over_ground_reference(isobus::NMEA2000Messages::CourseOverGroundSpeedOverGroundRapidUpdate::CourseOverGroundReference::True);
+
+			// PGN 129029 GNSS position data (1e-16 degrees, 1e-6 m altitude).
+			auto &gnss = nmea2000->get_gnss_position_data_transmit_message();
+			gnss.set_latitude(static_cast<std::int64_t>(latitude * 1e16));
+			gnss.set_longitude(static_cast<std::int64_t>(longitude * 1e16));
+			if (currentGps.altitudeM.has_value())
+			{
+				gnss.set_altitude(static_cast<std::int64_t>(*currentGps.altitudeM * 1e6));
+			}
+			if (currentGps.satellites.has_value())
+			{
+				gnss.set_number_of_space_vehicles(*currentGps.satellites);
+			}
+			if (currentGps.hdop.has_value())
+			{
+				gnss.set_horizontal_dilution_of_precision(static_cast<std::int16_t>(*currentGps.hdop * 100.0));
+			}
+			gnss.set_gnss_method(mapFixQualityToGnssMethod(currentGps.fixQuality));
+		}
+		nmea2000->update();
+	}
+
+
 
 	void TcBridge::refreshFieldNames()
 	{

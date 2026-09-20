@@ -28,6 +28,7 @@ namespace isobus
 {
 	class CANMessage;
 	class DeviceDescriptorObjectPool;
+	class NMEA2000MessageInterface;
 	class SpeedMessagesInterface;
 }
 
@@ -238,6 +239,7 @@ namespace agisotc
 		void updateTrailerPose(double elapsedSeconds);
 		void updateWorkCoverage(double elapsedSeconds);
 		void updateSpeedMessages(double elapsedSeconds);
+		void updateNmea2000Gps();
 		void rebuildFieldBoundaryPoints();
 		static void processGpsCanMessage(const isobus::CANMessage &message, void *parentPointer);
 
@@ -246,6 +248,7 @@ namespace agisotc
 		FieldTaskManager fieldTaskManager;
 		std::shared_ptr<GuiTaskControllerServer> server;
 		std::unique_ptr<isobus::SpeedMessagesInterface> speedMessages;
+		std::unique_ptr<isobus::NMEA2000MessageInterface> nmea2000;
 		std::thread pumpThread;
 		std::atomic_bool pumpRunning = { false };
 
