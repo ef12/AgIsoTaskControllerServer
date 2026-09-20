@@ -371,6 +371,7 @@ namespace agisotc
 		  true,
 		  true,
 		  false);
+		currentMachineDistanceMm = 0;
 		speedMessages->initialize();
 
 		auto options = isobus::TaskControllerOptions()
@@ -441,6 +442,10 @@ namespace agisotc
 	void TcBridge::poll()
 	{
 		updateGps();
+		if (!gpsRunningFlag)
+		{
+			updateSpeedMessages(0.0);
+		}
 		if (!running || (nullptr == server))
 		{
 			return;
@@ -1248,6 +1253,7 @@ namespace agisotc
 		}
 		gpsRunningFlag = true;
 		lastMotionUpdateMs = 0;
+		currentMachineDistanceMm = 0;
 		trailerPoseValid = false;
 		setStatus(QString("GPS started: %1.").arg(source));
 		logs.addLine(QString("[gps] Source started: %1.").arg(source));
@@ -1722,19 +1728,23 @@ namespace agisotc
 		{
 			return;
 		}
-		static constexpr std::uint16_t SPEED_NOT_AVAILABLE = 0xFFFF;
+		static constexpr double MAX_SPEED_MM_PER_SEC = 64255.0;
 
 		// Publish our sensed motion (GPS, driven by real receiver or simulator)
 		// as ground-based, wheel-based, and machine-selected speed so that
 		// implements and terminals on the bus pick up speed and distance.
-		std::uint16_t speedMmPerSec = SPEED_NOT_AVAILABLE;
+		std::uint16_t speedMmPerSec = 0;
 		auto direction = isobus::SpeedMessagesInterface::MachineDirection::NotAvailable;
+		auto selectedSpeedSource = isobus::SpeedMessagesInterface::MachineSelectedSpeedData::SpeedSource::NotAvailable;
 		if (currentGps.valid && currentGps.speedMps.has_value())
 		{
 			const double speedMps = std::max(0.0, *currentGps.speedMps);
-			speedMmPerSec = static_cast<std::uint16_t>(std::min<double>(SPEED_NOT_AVAILABLE - 1, speedMps * 1000.0));
+			speedMmPerSec = static_cast<std::uint16_t>(std::min(MAX_SPEED_MM_PER_SEC, speedMps * 1000.0));
 			direction = isobus::SpeedMessagesInterface::MachineDirection::Forward;
-			currentMachineDistanceMm += static_cast<std::uint32_t>(speedMps * 1000.0 * elapsedSeconds);
+			selectedSpeedSource = (currentGpsSourceText == "Simulated") ?
+			                        isobus::SpeedMessagesInterface::MachineSelectedSpeedData::SpeedSource::Simulated :
+			                        isobus::SpeedMessagesInterface::MachineSelectedSpeedData::SpeedSource::NavigationBasedSpeed;
+			currentMachineDistanceMm += static_cast<std::uint32_t>(std::max(0.0, speedMps * 1000.0 * elapsedSeconds));
 		}
 
 		speedMessages->groundBasedSpeedTransmitData.set_machine_speed(speedMmPerSec);
@@ -1743,9 +1753,22 @@ namespace agisotc
 		speedMessages->wheelBasedSpeedTransmitData.set_machine_speed(speedMmPerSec);
 		speedMessages->wheelBasedSpeedTransmitData.set_machine_distance(currentMachineDistanceMm);
 		speedMessages->wheelBasedSpeedTransmitData.set_machine_direction_of_travel(direction);
+		speedMessages->wheelBasedSpeedTransmitData.set_key_switch_state(
+		  isobus::SpeedMessagesInterface::WheelBasedMachineSpeedData::KeySwitchState::NotOff);
+		speedMessages->wheelBasedSpeedTransmitData.set_implement_start_stop_operations_state(
+		  taskActive ?
+		    isobus::SpeedMessagesInterface::WheelBasedMachineSpeedData::ImplementStartStopOperations::StartEnableImplementOperations :
+		    isobus::SpeedMessagesInterface::WheelBasedMachineSpeedData::ImplementStartStopOperations::StopDisableImplementOperations);
+		speedMessages->wheelBasedSpeedTransmitData.set_operator_direction_reversed_state(
+		  isobus::SpeedMessagesInterface::WheelBasedMachineSpeedData::OperatorDirectionReversed::NotReversed);
 		speedMessages->machineSelectedSpeedTransmitData.set_machine_speed(speedMmPerSec);
 		speedMessages->machineSelectedSpeedTransmitData.set_machine_distance(currentMachineDistanceMm);
 		speedMessages->machineSelectedSpeedTransmitData.set_machine_direction_of_travel(direction);
+		speedMessages->machineSelectedSpeedTransmitData.set_exit_reason_code(
+		  static_cast<std::uint8_t>(isobus::SpeedMessagesInterface::MachineSelectedSpeedData::ExitReasonCode::NoReasonAllClear));
+		speedMessages->machineSelectedSpeedTransmitData.set_speed_source(selectedSpeedSource);
+		speedMessages->machineSelectedSpeedTransmitData.set_limit_status(
+		  isobus::SpeedMessagesInterface::MachineSelectedSpeedData::LimitStatus::NotLimited);
 		speedMessages->update();
 	}
 
@@ -1774,6 +1797,7 @@ namespace agisotc
 				currentGps = solution;
 				emit gpsChanged();
 			}
+			updateSpeedMessages(elapsedSeconds);
 			return;
 		}
 		currentGps = solution;
