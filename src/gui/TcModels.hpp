@@ -168,6 +168,7 @@ namespace agisotc
 	struct BusFrameRow
 	{
 		QString timestamp;
+		QString direction; ///< "TX" (we sent it) or "RX" (received from the bus).
 		QString pgn;
 		int source = -1;
 		int destination = -1;
@@ -182,6 +183,7 @@ namespace agisotc
 		enum Roles
 		{
 			TimestampRole = Qt::UserRole + 1,
+			DirectionRole,
 			PgnRole,
 			SourceRole,
 			DestinationRole,

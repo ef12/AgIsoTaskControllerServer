@@ -188,6 +188,7 @@ GroupBox {
                     Layout.fillWidth: true
                     height: 22
                     Text { width: 80; text: "Time"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                    Text { width: 44; text: "Dir"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
                     Text { width: 110; text: "PGN"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
                     Text { width: 54; text: "Src"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
                     Text { width: 54; text: "Dst"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
@@ -207,6 +208,7 @@ GroupBox {
                         Row {
                             anchors.fill: parent
                             Text { width: 80; text: frameTime; color: "#9fb0c3"; font.pixelSize: 12 }
+                            Text { width: 44; text: frameDir; color: frameDir === "TX" ? "#73c7ff" : "#8fe388"; font.bold: frameDir === "TX"; font.pixelSize: 12 }
                             Text { width: 110; text: framePgn; color: "#73c7ff"; font.pixelSize: 12; elide: Text.ElideRight }
                             Text { width: 54; text: frameSrc; color: "#dfe6ee"; font.pixelSize: 12 }
                             Text { width: 54; text: frameDst; color: "#dfe6ee"; font.pixelSize: 12 }

@@ -286,6 +286,8 @@ namespace agisotc
 		{
 			case TimestampRole:
 				return row.timestamp;
+			case DirectionRole:
+				return row.direction;
 			case PgnRole:
 				return row.pgn;
 			case SourceRole:
@@ -305,6 +307,7 @@ namespace agisotc
 	{
 		return {
 			{ TimestampRole, "frameTime" },
+			{ DirectionRole, "frameDir" },
 			{ PgnRole, "framePgn" },
 			{ SourceRole, "frameSrc" },
 			{ DestinationRole, "frameDst" },
