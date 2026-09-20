@@ -1,286 +1,222 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Shapes
 
+// Top-down 2D field map. All coordinates are bridge local meters:
+// x = east, z = -north (north is up on screen). Heading/course is
+// degrees clockwise from north; Canvas rotation matches it directly
+// for shapes drawn pointing up (-y).
 Item {
     id: root
-    property double latitude: 0.0
-    property double longitude: 0.0
-    property double heading: 0.0
-    property double speed: 0.0
-    property var trackHistory: []
-    property var fieldBoundaries: []
-    property var currentBoundary: null
-    property double centerLat: 52.0
-    property double centerLon: 5.0
-    property double zoomLevel: 18.0
-    property bool showTrackHistory: true
-    property bool showFieldBoundaries: true
 
-    // Map projection helpers
-    function latLonToXY(lat, lon, centerLat, centerLon, zoom) {
-        // Simple Web Mercator-like projection for local display
-        // 1 degree lat ≈ 111km, 1 degree lon ≈ 111km * cos(lat)
-        var latRad = centerLat * Math.PI / 180.0;
-        var metersPerDegLat = 111319.0;
-        var metersPerDegLon = 111319.0 * Math.cos(latRad);
-        var scale = Math.pow(2, zoom) / 256.0; // pixels per meter at zoom
-        var dx = (lon - centerLon) * metersPerDegLon * scale;
-        var dy = -(lat - centerLat) * metersPerDegLat * scale; // Y inverted for screen coords
-        return { x: dx + width/2, y: dy + height/2 };
+    property real scale: 3.0 // pixels per meter
+    property bool follow: true
+
+    property real viewX: bridge.tractorX
+    property real viewZ: bridge.tractorZ
+
+    function toScreenX(x) { return width / 2 + (x - viewX) * scale; }
+    function toScreenZ(z) { return height / 2 + (z - viewZ) * scale; }
+
+    Timer {
+        interval: 200
+        running: true
+        repeat: true
+        onTriggered: {
+            if (root.follow && bridge.gpsValid) {
+                viewX = bridge.tractorX;
+                viewZ = bridge.tractorZ;
+            }
+            mapCanvas.requestPaint();
+        }
     }
 
-    // Tractor icon
     Canvas {
-        id: tractorCanvas
-        width: 40
-        height: 40
-        visible: latitude !== 0 || longitude !== 0
-
-        property double lat: latitude
-        property double lon: longitude
-        property double hdg: heading
-
-        onLatChanged: requestPaint()
-        onLonChanged: requestPaint()
-        onHdgChanged: requestPaint()
+        id: mapCanvas
+        anchors.fill: parent
 
         onPaint: {
             var ctx = getContext("2d");
-            ctx.clearRect(0, 0, width, height);
-            ctx.save();
-            ctx.translate(width/2, height/2);
-            ctx.rotate(hdg * Math.PI / 180.0);
+            var w = width, h = height;
+            ctx.clearRect(0, 0, w, h);
 
-            // Tractor body
-            ctx.fillStyle = "#2196F3";
-            ctx.beginPath();
-            ctx.moveTo(0, -15); // Front
-            ctx.lineTo(-10, 10); // Rear left
-            ctx.lineTo(10, 10);  // Rear right
-            ctx.closePath();
-            ctx.fill();
-
-            // Cab
-            ctx.fillStyle = "#1976D2";
-            ctx.beginPath();
-            ctx.moveTo(-5, -5);
-            ctx.lineTo(5, -5);
-            ctx.lineTo(3, 5);
-            ctx.lineTo(-3, 5);
-            ctx.closePath();
-            ctx.fill();
-
-            // Front indicator
-            ctx.fillStyle = "#FFEB3B";
-            ctx.beginPath();
-            ctx.moveTo(-3, -10);
-            ctx.lineTo(3, -10);
-            ctx.lineTo(0, -15);
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.restore();
-        }
-
-        // Position update
-        Component.onCompleted: {
-            var pos = root.latLonToXY(latitude, longitude, centerLat, centerLon, zoomLevel);
-            x = pos.x - width/2;
-            y = pos.y - height/2;
-        }
-
-        Binding {
-            target: tractorCanvas
-            property: "x"
-            value: {
-                var pos = root.latLonToXY(latitude, longitude, centerLat, centerLon, zoomLevel);
-                return pos.x - width/2;
-            }
-            when: latitude !== 0 || longitude !== 0
-        }
-
-        Binding {
-            target: tractorCanvas
-            property: "y"
-            value: {
-                var pos = root.latLonToXY(latitude, longitude, centerLat, centerLon, zoomLevel);
-                return pos.y - height/2;
-            }
-            when: latitude !== 0 || longitude !== 0
-        }
-    }
-
-    // Implement icon
-    Canvas {
-        id: implementCanvas
-        width: 50
-        height: 30
-        visible: latitude !== 0 || longitude !== 0
-
-        property double lat: implementLat
-        property double lon: implementLon
-        property double hdg: implementHeading
-
-        property double implementLat: 0
-        property double implementLon: 0
-        property double implementHeading: 0
-
-        onPaint: {
-            var ctx = getContext("2d");
-            ctx.clearRect(0, 0, width, height);
-            ctx.save();
-            ctx.translate(width/2, height/2);
-            ctx.rotate(hdg * Math.PI / 180.0);
-
-            // Implement body (wagon-like)
-            ctx.fillStyle = "#FF9800";
-            ctx.beginPath();
-            ctx.rect(-20, -10, 40, 20);
-            ctx.fill();
-
-            // Axles
-            ctx.fillStyle = "#E65100";
-            ctx.fillRect(-18, -12, 4, 24);
-            ctx.fillRect(14, -12, 4, 24);
-
-            // Hitch
-            ctx.fillStyle = "#795548";
-            ctx.fillRect(-20, -5, 8, 10);
-
-            ctx.restore();
-        }
-
-        Binding {
-            target: implementCanvas
-            property: "implementLat"
-            value: implementLat
-        }
-        Binding {
-            target: implementCanvas
-            property: "implementLon"
-            value: implementLon
-        }
-        Binding {
-            target: implementCanvas
-            property: "implementHeading"
-            value: implementHeading
-        }
-
-        Binding {
-            target: implementCanvas
-            property: "x"
-            value: {
-                var pos = root.latLonToXY(implementLat, implementLon, centerLat, centerLon, zoomLevel);
-                return pos.x - width/2;
-            }
-            when: implementLat !== 0 || implementLon !== 0
-        }
-        Binding {
-            target: implementCanvas
-            property: "y"
-            value: {
-                var pos = root.latLonToXY(implementLat, implementLon, centerLat, centerLon, zoomLevel);
-                return pos.y - height/2;
-            }
-            when: implementLat !== 0 || implementLon !== 0
-        }
-    }
-
-    // Track history
-    Repeater {
-        model: showTrackHistory ? trackHistory : []
-        delegate: Canvas {
-            width: 6
-            height: 6
-            x: {
-                var pos = root.latLonToXY(modelData.latitudeDeg, modelData.longitudeDeg, centerLat, centerLon, zoomLevel);
-                return pos.x - width/2;
-            }
-            y: {
-                var pos = root.latLonToXY(modelData.latitudeDeg, modelData.longitudeDeg, centerLat, centerLon, zoomLevel);
-                return pos.y - height/2;
-            }
-            visible: latitudeDeg !== 0 && longitudeDeg !== 0
-            onPaint: {
-                var ctx = getContext("2d");
-                ctx.fillStyle = "#4CAF50";
-                ctx.globalAlpha = 0.6;
-                ctx.beginPath();
-                ctx.arc(width/2, height/2, 2, 0, 2*Math.PI);
-                ctx.fill();
-            }
-        }
-    }
-
-    // Field boundaries
-    Repeater {
-        model: showFieldBoundaries ? fieldBoundaries : []
-        delegate: Shape {
-            ShapePath {
-                strokeWidth: 2
-                strokeColor: "#4CAF50"
-                fillColor: "#4CAF50"
-                fillOpacity: 0.1
-                fillRule: ShapePath.OddEvenFill
-
-                Path {
-                    startX: 0
-                    startY: 0
-                    PathSvg { path: modelData.path }
-                }
-            }
-        }
-    }
-
-    // Current boundary being recorded
-    Shape {
-        visible: currentBoundary && currentBoundary.vertices && currentBoundary.vertices.length > 1
-        ShapePath {
-            strokeWidth: 3
-            strokeColor: "#FFC107"
-            strokeStyle: ShapePath.DashLine
-            dashPattern: [10, 5]
-
-            Path {
-                startX: {
-                    var pos = root.latLonToXY(currentBoundary.vertices[0].first, currentBoundary.vertices[0].second, centerLat, centerLon, zoomLevel);
-                    return pos.x - root.width/2;
-                }
-                startY: {
-                    var pos = root.latLonToXY(currentBoundary.vertices[0].first, currentBoundary.vertices[0].second, centerLat, centerLon, zoomLevel);
-                    return pos.y - root.height/2;
-                }
-                PathSvg {
-                    path: {
-                        var path = "";
-                        for (var i = 1; i < currentBoundary.vertices.length; i++) {
-                            var pos = root.latLonToXY(currentBoundary.vertices[i].first, currentBoundary.vertices[i].second, centerLat, centerLon, zoomLevel);
-                            path += "L " + (pos.x - root.width/2) + " " + (pos.y - root.height/2) + " ";
-                        }
-                        return path;
-                    }
-                }
-            }
-        }
-    }
-
-    // Center crosshair
-    Canvas {
-        anchors.centerIn: parent
-        width: 30
-        height: 30
-        visible: true
-        onPaint: {
-            var ctx = getContext("2d");
-            ctx.strokeStyle = "#FFFFFF";
+            // Background grid (10 m spacing)
+            ctx.strokeStyle = "#242b34";
             ctx.lineWidth = 1;
+            var step = 10 * root.scale;
+            if (step < 8) step = 50 * root.scale;
+            var ox = (w / 2 - root.viewX * root.scale) % step;
+            var oy = (h / 2 - root.viewZ * root.scale) % step;
             ctx.beginPath();
-            ctx.moveTo(width/2 - 10, height/2);
-            ctx.lineTo(width/2 + 10, height/2);
-            ctx.moveTo(width/2, height/2 - 10);
-            ctx.lineTo(width/2, height/2 + 10);
+            for (var gx = ox; gx < w; gx += step) { ctx.moveTo(gx, 0); ctx.lineTo(gx, h); }
+            for (var gy = oy; gy < h; gy += step) { ctx.moveTo(0, gy); ctx.lineTo(w, gy); }
             ctx.stroke();
+
+            // Field boundary polygon
+            var boundary = bridge.fieldBoundaryPoints;
+            if (boundary && boundary.length >= 3) {
+                ctx.beginPath();
+                var first = true;
+                for (var i = 0; i < boundary.length; i++) {
+                    var bp = boundary[i];
+                    var sx = root.toScreenX(bp.x), sy = root.toScreenZ(bp.z);
+                    if (first) { ctx.moveTo(sx, sy); first = false; }
+                    else { ctx.lineTo(sx, sy); }
+                }
+                ctx.closePath();
+                ctx.fillStyle = bridge.boundaryRecording ? "rgba(242, 211, 60, 0.08)" : "rgba(53, 199, 89, 0.08)";
+                ctx.fill();
+                ctx.strokeStyle = bridge.boundaryRecording ? "#f2d33c" : "#35c759";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // Worked swaths (decimated for speed)
+            var worked = bridge.workedPoints;
+            if (worked && worked.length > 0) {
+                var stride = Math.max(1, Math.ceil(worked.length / 900));
+                ctx.fillStyle = "rgba(53, 199, 89, 0.55)";
+                for (var k = 0; k < worked.length; k += stride) {
+                    var wp = worked[k];
+                    var wx = root.toScreenX(wp.x), wy = root.toScreenZ(wp.z);
+                    if (wx < -20 || wy < -20 || wx > w + 20 || wy > h + 20) continue;
+                    ctx.save();
+                    ctx.translate(wx, wy);
+                    ctx.rotate((wp.course || 0) * Math.PI / 180);
+                    var sw = Math.max(1.5, (wp.width || 3) * root.scale);
+                    ctx.fillRect(-sw / 2, -0.4 * root.scale, sw, 0.8 * root.scale);
+                    ctx.restore();
+                }
+            }
+
+            // Track history polyline (decimated)
+            var track = bridge.trackPoints;
+            if (track && track.length > 1) {
+                var tstride = Math.max(1, Math.ceil(track.length / 700));
+                ctx.beginPath();
+                var started = false;
+                for (var t = 0; t < track.length; t += tstride) {
+                    var tp = track[t];
+                    var tx = root.toScreenX(tp.x), ty = root.toScreenZ(tp.z);
+                    if (!started) { ctx.moveTo(tx, ty); started = true; }
+                    else { ctx.lineTo(tx, ty); }
+                }
+                ctx.strokeStyle = "rgba(115, 199, 255, 0.8)";
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+
+            // Trailed implement (rectangle, heading of implement)
+            if (bridge.gpsValid) {
+                var ix = root.toScreenX(bridge.implementX), iy = root.toScreenZ(bridge.implementZ);
+                ctx.save();
+                ctx.translate(ix, iy);
+                ctx.rotate(bridge.implementCourse * Math.PI / 180);
+                var il = 6 * root.scale, iw = 3 * root.scale;
+                ctx.fillStyle = "#8a5a1e";
+                ctx.strokeStyle = "#f0a832";
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.rect(-iw / 2, -il / 2, iw, il);
+                ctx.fill();
+                ctx.stroke();
+                // Hitch bar toward tractor
+                ctx.strokeStyle = "#c7d0dc";
+                ctx.beginPath();
+                ctx.moveTo(0, -il / 2);
+                ctx.lineTo(0, -il / 2 - 2.8 * root.scale);
+                ctx.stroke();
+                ctx.restore();
+
+                // Tractor top view: front = driving direction = up at course 0.
+                var px = root.toScreenX(bridge.tractorX), py = root.toScreenZ(bridge.tractorZ);
+                ctx.save();
+                ctx.translate(px, py);
+                ctx.rotate(bridge.gpsCourse * Math.PI / 180);
+                var tractorLength = 4.8 * root.scale;
+                var tractorWidth = 2.6 * root.scale;
+                var rearWheel = 0.9 * root.scale;
+                var frontWheel = 0.62 * root.scale;
+
+                ctx.fillStyle = "#237a34";
+                ctx.strokeStyle = "#dce8f5";
+                ctx.lineWidth = 1.2;
+                ctx.fillRect(-tractorWidth * 0.38, -tractorLength * 0.42, tractorWidth * 0.76, tractorLength * 0.82);
+                ctx.strokeRect(-tractorWidth * 0.38, -tractorLength * 0.42, tractorWidth * 0.76, tractorLength * 0.82);
+                ctx.fillStyle = "#2f9d45";
+                ctx.fillRect(-tractorWidth * 0.27, -tractorLength * 0.58, tractorWidth * 0.54, tractorLength * 0.34);
+                ctx.fillStyle = "#8dd9ff";
+                ctx.globalAlpha = 0.82;
+                ctx.fillRect(-tractorWidth * 0.31, tractorLength * 0.05, tractorWidth * 0.62, tractorLength * 0.27);
+                ctx.globalAlpha = 1.0;
+                ctx.fillStyle = "#e6d74a";
+                ctx.fillRect(-tractorWidth * 0.2, -tractorLength * 0.67, tractorWidth * 0.4, tractorLength * 0.08);
+
+                function wheel(x, y, w, h, steer) {
+                    ctx.save();
+                    ctx.translate(x, y);
+                    ctx.rotate(steer * Math.PI / 180);
+                    ctx.fillStyle = "#111417";
+                    ctx.fillRect(-w / 2, -h / 2, w, h);
+                    ctx.fillStyle = "#f0c33c";
+                    ctx.fillRect(-w * 0.22, -h * 0.22, w * 0.44, h * 0.44);
+                    ctx.restore();
+                }
+                wheel(-tractorWidth * 0.62, tractorLength * 0.22, rearWheel, rearWheel * 0.42, 0);
+                wheel( tractorWidth * 0.62, tractorLength * 0.22, rearWheel, rearWheel * 0.42, 0);
+                wheel(-tractorWidth * 0.52, -tractorLength * 0.40, frontWheel, frontWheel * 0.38, bridge.steeringAngle);
+                wheel( tractorWidth * 0.52, -tractorLength * 0.40, frontWheel, frontWheel * 0.38, bridge.steeringAngle);
+                ctx.restore();
+            }
+
+            // Center crosshair when not following
+            if (!root.follow) {
+                ctx.strokeStyle = "#59636f";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(w / 2 - 8, h / 2); ctx.lineTo(w / 2 + 8, h / 2);
+                ctx.moveTo(w / 2, h / 2 - 8); ctx.lineTo(w / 2, h / 2 + 8);
+                ctx.stroke();
+            }
+        }
+    }
+
+    // Pan by dragging when not following
+    MouseArea {
+        anchors.fill: parent
+        enabled: !root.follow
+        property real lastX: 0
+        property real lastY: 0
+        onPressed: function (mouse) { lastX = mouse.x; lastY = mouse.y; }
+        onPositionChanged: function (mouse) {
+            root.viewX -= (mouse.x - lastX) / root.scale;
+            root.viewZ -= (mouse.y - lastY) / root.scale;
+            lastX = mouse.x; lastY = mouse.y;
+        }
+        onWheel: function (wheel) {
+            if (wheel.angleDelta.y > 0) root.scale = Math.min(30, root.scale * 1.15);
+            else root.scale = Math.max(0.5, root.scale / 1.15);
+        }
+    }
+
+    // Zoom controls
+    Column {
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: 8
+        spacing: 6
+        Button {
+            text: "+"; width: 36; height: 36
+            onClicked: root.scale = Math.min(30, root.scale * 1.25)
+        }
+        Button {
+            text: "−"; width: 36; height: 36
+            onClicked: root.scale = Math.max(0.5, root.scale / 1.25)
+        }
+        Button {
+            text: "◎"; width: 36; height: 36
+            checkable: true
+            checked: root.follow
+            onClicked: root.follow = !root.follow
         }
     }
 }

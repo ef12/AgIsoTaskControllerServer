@@ -130,7 +130,7 @@ GroupBox {
                         delegate: Model {
                             source: "#Cube"
                             position: Qt.vector3d(modelData.x, 0.04, modelData.z)
-                            eulerRotation.y: modelData.course
+                            eulerRotation.y: -modelData.course
                             scale: Qt.vector3d(Math.max(0.006, modelData.width / 100), 0.0008, 0.012)
                             materials: PrincipledMaterial { baseColor: "#7cb342"; opacity: 0.72; roughness: 1.0 }
                         }
@@ -139,37 +139,67 @@ GroupBox {
 
                 Node {
                     position: Qt.vector3d(bridge.tractorX, 1.2, bridge.tractorZ)
-                    eulerRotation.y: bridge.gpsCourse
+                    eulerRotation.y: -bridge.gpsCourse
 
-                    // Tractor dimensions are represented in metres. Its rear hitch is at +Z.
+                    // Tractor dimensions are represented in metres. Front is local -Z.
                     Model {
                         source: "#Cube"
-                        position: Qt.vector3d(0, 0.7, 0)
-                        scale: Qt.vector3d(0.025, 0.018, 0.052)
-                        materials: PrincipledMaterial { baseColor: "#35c759"; metalness: 0.1; roughness: 0.5 }
+                        position: Qt.vector3d(0, 0.45, -0.55)
+                        scale: Qt.vector3d(0.028, 0.011, 0.026)
+                        materials: PrincipledMaterial { baseColor: "#237a34"; metalness: 0.15; roughness: 0.45 }
                     }
                     Model {
                         source: "#Cube"
-                        position: Qt.vector3d(0, 2.15, 0.65)
-                        scale: Qt.vector3d(0.026, 0.022, 0.027)
-                        materials: PrincipledMaterial { baseColor: "#8dd9ff"; metalness: 0.25; roughness: 0.25 }
+                        position: Qt.vector3d(0, 1.15, -1.75)
+                        scale: Qt.vector3d(0.019, 0.011, 0.032)
+                        materials: PrincipledMaterial { baseColor: "#2f9d45"; metalness: 0.18; roughness: 0.38 }
                     }
                     Model {
                         source: "#Cube"
-                        position: Qt.vector3d(0, 0.4, -3.7)
-                        scale: Qt.vector3d(0.022, 0.012, 0.022)
-                        materials: PrincipledMaterial { baseColor: "#2fa84d"; roughness: 0.55 }
+                        position: Qt.vector3d(0, 1.55, 0.9)
+                        scale: Qt.vector3d(0.022, 0.018, 0.021)
+                        materials: PrincipledMaterial { baseColor: "#151a20"; metalness: 0.25; roughness: 0.25 }
                     }
-                    Model { source: "#Cylinder"; position: Qt.vector3d(-1.55, 0, -2.5); eulerRotation.z: 90; scale: Qt.vector3d(0.014, 0.007, 0.014); materials: PrincipledMaterial { baseColor: "#171a1d"; roughness: 0.9 } }
-                    Model { source: "#Cylinder"; position: Qt.vector3d( 1.55, 0, -2.5); eulerRotation.z: 90; scale: Qt.vector3d(0.014, 0.007, 0.014); materials: PrincipledMaterial { baseColor: "#171a1d"; roughness: 0.9 } }
-                    Model { source: "#Cylinder"; position: Qt.vector3d(-1.65, 0,  2.5); eulerRotation.z: 90; scale: Qt.vector3d(0.019, 0.008, 0.019); materials: PrincipledMaterial { baseColor: "#171a1d"; roughness: 0.9 } }
-                    Model { source: "#Cylinder"; position: Qt.vector3d( 1.65, 0,  2.5); eulerRotation.z: 90; scale: Qt.vector3d(0.019, 0.008, 0.019); materials: PrincipledMaterial { baseColor: "#171a1d"; roughness: 0.9 } }
+                    Model {
+                        source: "#Cube"
+                        position: Qt.vector3d(0, 1.56, 0.9)
+                        scale: Qt.vector3d(0.018, 0.015, 0.017)
+                        materials: PrincipledMaterial { baseColor: "#8dd9ff"; metalness: 0.05; roughness: 0.12; opacity: 0.78 }
+                    }
+                    Model {
+                        source: "#Cube"
+                        position: Qt.vector3d(0, 0.5, -3.25)
+                        scale: Qt.vector3d(0.016, 0.007, 0.022)
+                        materials: PrincipledMaterial { baseColor: "#e6d74a"; roughness: 0.35 }
+                    }
+                    Model {
+                        source: "#Cube"
+                        position: Qt.vector3d(0, 0.55, 2.55)
+                        scale: Qt.vector3d(0.034, 0.006, 0.012)
+                        materials: PrincipledMaterial { baseColor: "#3b424b"; roughness: 0.65 }
+                    }
+                    Node {
+                        position: Qt.vector3d(-1.45, 0, -1.95)
+                        eulerRotation.y: -bridge.steeringAngle
+                        Model { source: "#Cylinder"; eulerRotation.z: 90; scale: Qt.vector3d(0.013, 0.006, 0.013); materials: PrincipledMaterial { baseColor: "#111417"; roughness: 0.9 } }
+                        Model { source: "#Cylinder"; eulerRotation.z: 90; scale: Qt.vector3d(0.008, 0.0065, 0.008); materials: PrincipledMaterial { baseColor: "#2f9d45"; metalness: 0.25; roughness: 0.45 } }
+                    }
+                    Node {
+                        position: Qt.vector3d(1.45, 0, -1.95)
+                        eulerRotation.y: -bridge.steeringAngle
+                        Model { source: "#Cylinder"; eulerRotation.z: 90; scale: Qt.vector3d(0.013, 0.006, 0.013); materials: PrincipledMaterial { baseColor: "#111417"; roughness: 0.9 } }
+                        Model { source: "#Cylinder"; eulerRotation.z: 90; scale: Qt.vector3d(0.008, 0.0065, 0.008); materials: PrincipledMaterial { baseColor: "#2f9d45"; metalness: 0.25; roughness: 0.45 } }
+                    }
+                    Model { source: "#Cylinder"; position: Qt.vector3d(-1.65, 0, 1.65); eulerRotation.z: 90; scale: Qt.vector3d(0.022, 0.009, 0.022); materials: PrincipledMaterial { baseColor: "#111417"; roughness: 0.9 } }
+                    Model { source: "#Cylinder"; position: Qt.vector3d( 1.65, 0, 1.65); eulerRotation.z: 90; scale: Qt.vector3d(0.022, 0.009, 0.022); materials: PrincipledMaterial { baseColor: "#111417"; roughness: 0.9 } }
+                    Model { source: "#Cylinder"; position: Qt.vector3d(-1.65, 0, 1.65); eulerRotation.z: 90; scale: Qt.vector3d(0.013, 0.0095, 0.013); materials: PrincipledMaterial { baseColor: "#f0c33c"; metalness: 0.35; roughness: 0.4 } }
+                    Model { source: "#Cylinder"; position: Qt.vector3d( 1.65, 0, 1.65); eulerRotation.z: 90; scale: Qt.vector3d(0.013, 0.0095, 0.013); materials: PrincipledMaterial { baseColor: "#f0c33c"; metalness: 0.35; roughness: 0.4 } }
                 }
 
                 // The implement pivots around the tractor hitch and follows with its own heading.
                 Node {
                         position: Qt.vector3d(bridge.implementX, 0.8, bridge.implementZ)
-                        eulerRotation.y: bridge.implementCourse
+                        eulerRotation.y: -bridge.implementCourse
                         Repeater3D {
                             model: bridge.implementElements
                             delegate: Model {
@@ -307,7 +337,7 @@ GroupBox {
             Label { text: "Sections:"; color: "#c7d0dc" }
             SpinBox {
                 from: 1
-                to: 64
+                to: 96
                 value: 16
                 editable: true
                 Layout.preferredWidth: 80

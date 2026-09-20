@@ -191,6 +191,80 @@ namespace agisotc
 		endResetModel();
 	}
 
+	DdiTrafficModel::DdiTrafficModel(QObject *parent) :
+	  QAbstractListModel(parent)
+	{
+	}
+
+	int DdiTrafficModel::rowCount(const QModelIndex &parent) const
+	{
+		return parent.isValid() ? 0 : rows.size();
+	}
+
+	QVariant DdiTrafficModel::data(const QModelIndex &index, int role) const
+	{
+		if (!index.isValid() || index.row() < 0 || index.row() >= rows.size())
+		{
+			return {};
+		}
+		const auto &row = rows.at(index.row());
+		switch (role)
+		{
+			case TimestampRole:
+				return row.timestamp;
+			case DirectionRole:
+				return row.direction;
+			case CommandRole:
+				return row.command;
+			case AddressRole:
+				return row.address;
+			case DdiRole:
+				return row.ddi;
+			case ElementRole:
+				return row.element;
+			case ValueRole:
+				return row.value;
+			case DetailRole:
+				return row.detail;
+			default:
+				return {};
+		}
+	}
+
+	QHash<int, QByteArray> DdiTrafficModel::roleNames() const
+	{
+		return {
+			{ TimestampRole, "trafficTime" },
+			{ DirectionRole, "trafficDirection" },
+			{ CommandRole, "trafficCommand" },
+			{ AddressRole, "trafficAddress" },
+			{ DdiRole, "trafficDdi" },
+			{ ElementRole, "trafficElement" },
+			{ ValueRole, "trafficValue" },
+			{ DetailRole, "trafficDetail" },
+		};
+	}
+
+	void DdiTrafficModel::addRow(const DdiTrafficRow &row)
+	{
+		if (rows.size() >= MAX_ROWS)
+		{
+			beginRemoveRows(QModelIndex(), 0, 0);
+			rows.removeFirst();
+			endRemoveRows();
+		}
+		beginInsertRows(QModelIndex(), rows.size(), rows.size());
+		rows.push_back(row);
+		endInsertRows();
+	}
+
+	void DdiTrafficModel::clear()
+	{
+		beginResetModel();
+		rows.clear();
+		endResetModel();
+	}
+
 	LogModel::LogModel(QObject *parent) :
 	  QAbstractListModel(parent)
 	{

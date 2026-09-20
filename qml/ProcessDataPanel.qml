@@ -13,6 +13,7 @@ GroupBox {
             TabButton { text: "TC-Basic" }
             TabButton { text: "TC-SC" }
             TabButton { text: "Raw process data" }
+            TabButton { text: "DDI traffic" }
         }
         StackLayout {
             Layout.fillWidth: true
@@ -67,15 +68,16 @@ GroupBox {
                     Repeater {
                         model: bridge.sectionStates
                         delegate: Rectangle {
-                            width: 58
-                            height: 38
+                            width: 46
+                            height: 30
                             radius: 4
                             color: modelData ? "#b59d19" : "#29313a"
                             border.color: modelData ? "#f2d33c" : "#59636f"
                             Label {
                                 anchors.centerIn: parent
-                                text: (index + 1) + "  " + (modelData ? "ON" : "OFF")
+                                text: (index + 1) + " " + (modelData ? "ON" : "OFF")
                                 color: modelData ? "white" : "#9fb0c3"
+                                font.pixelSize: 11
                                 font.bold: modelData
                             }
                         }
@@ -107,6 +109,61 @@ GroupBox {
                         Text { width: 90; text: valueElement; color: "#dfe6ee"; font.pixelSize: 12 }
                         Text { width: 140; text: valueContent; color: "#8fe388"; font.pixelSize: 12 }
                         Text { text: valueTime; color: "#9fb0c3"; font.pixelSize: 12 }
+                    }
+                }
+            }
+            ColumnLayout {
+                spacing: 4
+                RowLayout {
+                    Layout.fillWidth: true
+                    CheckBox {
+                        text: "Live watch"
+                        checked: bridge.liveDdiTrafficWatch
+                        onToggled: bridge.setLiveDdiTrafficWatch(checked)
+                    }
+                    Label {
+                        text: bridge.liveDdiTrafficWatch ? "showing continuous TC/client DDI traffic" : "off"
+                        color: bridge.liveDdiTrafficWatch ? "#8fe388" : "#8995a3"
+                    }
+                    Item { Layout.fillWidth: true }
+                    Button {
+                        text: "Clear"
+                        onClicked: bridge.clearDdiTraffic()
+                    }
+                }
+                Row {
+                    Layout.fillWidth: true
+                    height: 22
+                    Text { width: 80; text: "Time"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                    Text { width: 92; text: "Direction"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                    Text { width: 104; text: "Command"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                    Text { width: 54; text: "Addr"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                    Text { width: 74; text: "DDI"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                    Text { width: 70; text: "Elem"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                    Text { width: 88; text: "Value"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                    Text { text: "Detail"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                }
+                Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: "#3a4048" }
+                ListView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    model: ddiTrafficModel
+                    clip: true
+                    delegate: Rectangle {
+                        width: ListView.view ? ListView.view.width : 600
+                        height: 22
+                        color: index % 2 ? "#151a20" : "transparent"
+                        Row {
+                            anchors.fill: parent
+                            Text { width: 80; text: trafficTime; color: "#9fb0c3"; font.pixelSize: 12 }
+                            Text { width: 92; text: trafficDirection; color: trafficDirection.indexOf("TC") === 0 ? "#73c7ff" : "#f2d33c"; font.pixelSize: 12 }
+                            Text { width: 104; text: trafficCommand; color: "#dfe6ee"; font.pixelSize: 12; elide: Text.ElideRight }
+                            Text { width: 54; text: trafficAddress; color: "#dfe6ee"; font.pixelSize: 12 }
+                            Text { width: 74; text: trafficDdi; color: "#dfe6ee"; font.pixelSize: 12 }
+                            Text { width: 70; text: trafficElement; color: "#dfe6ee"; font.pixelSize: 12 }
+                            Text { width: 88; text: trafficValue; color: "#8fe388"; font.pixelSize: 12 }
+                            Text { text: trafficDetail; color: "#8995a3"; font.pixelSize: 12; elide: Text.ElideRight }
+                        }
                     }
                 }
             }

@@ -152,6 +152,9 @@ if(WIN32 AND AGISOTC_BUILD_GUI)
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/CommandPanel.qml
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/SectionView3D.qml
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/OperationsPanel.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/MapWindow.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/FieldMapView.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/SectionStatusPanel.qml
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/LogPanel.qml
         ${CMAKE_CURRENT_BINARY_DIR}/stage
       COMMENT "Running windeployqt, staging Qt deps, and copying QML files"

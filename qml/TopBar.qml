@@ -56,7 +56,7 @@ RowLayout {
     SpinBox {
         id: sectionSpin
         from: 1
-        to: 255
+        to: 96
         value: 16
         enabled: !bridge.running
         Layout.preferredWidth: 80

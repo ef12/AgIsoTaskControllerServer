@@ -54,11 +54,25 @@ namespace agisotc
 		std::uint64_t timestampMs = 0;
 	};
 
+	struct DdiTrafficEvent
+	{
+		std::uint8_t address = 0xFE;
+		std::uint16_t ddi = 0;
+		std::uint16_t element = 0;
+		std::int32_t value = 0;
+		std::uint8_t errorCode = 0;
+		std::uint8_t command = 0;
+		bool hasValue = false;
+		bool acknowledge = false;
+		std::uint64_t timestampMs = 0;
+	};
+
 	/// @brief Batch of events drained by the GUI thread.
 	struct CoreEvents
 	{
 		std::vector<std::string> logLines;
 		std::vector<ValueEvent> values;
+		std::vector<DdiTrafficEvent> ddiTraffic;
 		bool rosterChanged = false;
 		std::vector<std::uint8_t> poolsChanged;
 		bool identifyRequested = false;
@@ -144,6 +158,7 @@ namespace agisotc
 		std::map<std::uintptr_t, ClientRecord> records; ///< Keyed by control function pointer.
 		std::deque<std::string> pendingLogs;
 		std::deque<ValueEvent> pendingValues;
+		std::deque<DdiTrafficEvent> pendingDdiTraffic;
 		std::vector<std::uint8_t> pendingPoolsChanged;
 		bool rosterDirty = false;
 		bool identifyPending = false;

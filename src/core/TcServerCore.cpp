@@ -185,6 +185,15 @@ namespace agisotc
 		           " element " + std::to_string(elementNumber) +
 		           " errors " + to_hex(errorCodesFromClient, 2) +
 		           " for command " + std::to_string(static_cast<unsigned>(processDataCommand)));
+		DdiTrafficEvent event;
+		event.address = record.snapshot.address;
+		event.ddi = dataDescriptionIndex;
+		event.element = elementNumber;
+		event.errorCode = errorCodesFromClient;
+		event.command = static_cast<std::uint8_t>(processDataCommand);
+		event.acknowledge = true;
+		event.timestampMs = steady_clock_ms();
+		pendingDdiTraffic.push_back(event);
 	}
 
 	bool GuiTaskControllerServer::on_value_command(std::shared_ptr<isobus::ControlFunction> clientControlFunction,
@@ -202,6 +211,14 @@ namespace agisotc
 		event.value = processDataValue;
 		event.timestampMs = steady_clock_ms();
 		pendingValues.push_back(event);
+		DdiTrafficEvent traffic;
+		traffic.address = event.address;
+		traffic.ddi = event.ddi;
+		traffic.element = event.element;
+		traffic.value = event.value;
+		traffic.hasValue = true;
+		traffic.timestampMs = event.timestampMs;
+		pendingDdiTraffic.push_back(traffic);
 		errorCodes = 0;
 		return true;
 	}
@@ -232,6 +249,8 @@ namespace agisotc
 		pendingLogs.clear();
 		events.values.assign(pendingValues.begin(), pendingValues.end());
 		pendingValues.clear();
+		events.ddiTraffic.assign(pendingDdiTraffic.begin(), pendingDdiTraffic.end());
+		pendingDdiTraffic.clear();
 		events.rosterChanged = rosterDirty;
 		rosterDirty = false;
 		events.poolsChanged = std::move(pendingPoolsChanged);

@@ -33,6 +33,10 @@ ApplicationWindow {
         }
     }
 
+    MapWindow {
+        id: mapWindow
+    }
+
     Rectangle {
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
@@ -101,6 +105,10 @@ ApplicationWindow {
                 OperationsPanel {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 400
+                    onOpenFieldMapRequested: {
+                        mapWindow.visible = true
+                        mapWindow.requestActivate()
+                    }
                 }
                 DdopPanel {
                     Layout.fillWidth: true

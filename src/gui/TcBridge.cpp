@@ -292,6 +292,7 @@ namespace agisotc
 	QVariantList TcBridge::implementDdis() const { return currentImplementDdis; }
 	bool TcBridge::autoDdiSync() const { return autoDdiSyncEnabled; }
 	int TcBridge::ddiSyncIntervalMs() const { return currentDdiSyncIntervalMs; }
+	bool TcBridge::liveDdiTrafficWatch() const { return liveDdiTrafficWatchEnabled; }
 	QVariantList TcBridge::tcBasicData() const { return currentTcBasicData; }
 	int TcBridge::activeSectionCount() const
 	{
@@ -320,6 +321,11 @@ namespace agisotc
 	ProcessDataModel *TcBridge::valueModel()
 	{
 		return &values;
+	}
+
+	DdiTrafficModel *TcBridge::ddiTrafficModel()
+	{
+		return &ddiTraffic;
 	}
 
 	LogModel *TcBridge::logModel()
@@ -445,6 +451,21 @@ namespace agisotc
 				{
 					currentSectionStates[value.element - 1] = QVariant(on);
 					emit sectionStatesChanged();
+				}
+			}
+		}
+		if (liveDdiTrafficWatchEnabled)
+		{
+			for (const auto &event : events.ddiTraffic)
+			{
+				if (event.acknowledge)
+				{
+					appendDdiTraffic("client -> TC", "PDACK", event.address, event.ddi, event.element, event.errorCode,
+					                 QString("command %1").arg(event.command));
+				}
+				else if (event.hasValue)
+				{
+					appendDdiTraffic("client -> TC", "Value", event.address, event.ddi, event.element, event.value, "reported");
 				}
 			}
 		}
@@ -738,9 +759,10 @@ namespace agisotc
 		  [](const ImplementElementState &element) {
 			  return element.type == static_cast<int>(isobus::task_controller_object::DeviceElementObject::Type::Section);
 		  }));
-		if ((ddopSectionCount > 0) && (currentSectionCount != ddopSectionCount))
+		const int limitedDdopSectionCount = std::clamp(ddopSectionCount, 1, 96);
+		if ((ddopSectionCount > 0) && (currentSectionCount != limitedDdopSectionCount))
 		{
-			currentSectionCount = ddopSectionCount;
+			currentSectionCount = limitedDdopSectionCount;
 			currentSectionStates = QVariantList(currentSectionCount, QVariant(false));
 			emit sectionCountChanged();
 			emit sectionStatesChanged();
@@ -921,6 +943,35 @@ namespace agisotc
 		emit autoDdiSyncChanged();
 	}
 
+	void TcBridge::setLiveDdiTrafficWatch(bool enabled)
+	{
+		if (liveDdiTrafficWatchEnabled == enabled) return;
+		liveDdiTrafficWatchEnabled = enabled;
+		emit liveDdiTrafficWatchChanged();
+		logs.addLine(QString("[ddi] Live traffic watch %1.").arg(enabled ? "enabled" : "disabled"));
+	}
+
+	void TcBridge::clearDdiTraffic()
+	{
+		ddiTraffic.clear();
+	}
+
+	void TcBridge::appendDdiTraffic(const QString &direction, const QString &command, int address, int ddi, int element,
+	                                std::int32_t value, const QString &detail)
+	{
+		if (!liveDdiTrafficWatchEnabled) return;
+		DdiTrafficRow row;
+		row.timestamp = timestamp_now();
+		row.direction = direction;
+		row.command = command;
+		row.address = address;
+		row.ddi = ddi;
+		row.element = element;
+		row.value = value;
+		row.detail = detail;
+		ddiTraffic.addRow(row);
+	}
+
 	void TcBridge::requestImplementDdis()
 	{
 		if (!running || (nullptr == server) || (currentSelectedClient < 0) || implementDdiStates.empty()) return;
@@ -929,7 +980,11 @@ namespace agisotc
 		int sentCount = 0;
 		for (const auto &state : implementDdiStates)
 		{
-			if (server->send_request_value(client, state.ddi, state.element)) ++sentCount;
+			if (server->send_request_value(client, state.ddi, state.element))
+			{
+				++sentCount;
+				appendDdiTraffic("TC -> client", "Request", currentSelectedClient, state.ddi, state.element, 0, state.name);
+			}
 		}
 		logs.addLine(QString("[ddop] Requested %1/%2 declared process values from %3.")
 		               .arg(sentCount).arg(implementDdiStates.size()).arg(currentImplementName));
@@ -953,8 +1008,16 @@ namespace agisotc
 			{
 				state.reportingConfigured = server->send_time_interval_measurement_command(
 				  client, state.ddi, state.element, static_cast<std::uint32_t>(currentDdiSyncIntervalMs));
+				if (state.reportingConfigured)
+				{
+					appendDdiTraffic("TC -> client", "Time interval", currentSelectedClient, state.ddi, state.element,
+					                 currentDdiSyncIntervalMs, state.name);
+				}
 			}
-			server->send_request_value(client, state.ddi, state.element);
+			if (server->send_request_value(client, state.ddi, state.element))
+			{
+				appendDdiTraffic("TC -> client", "Request", currentSelectedClient, state.ddi, state.element, 0, state.name);
+			}
 			++nextDdiSyncIndex;
 		}
 		lastDdiSyncMs = now;
@@ -1006,6 +1069,7 @@ namespace agisotc
 		}
 		const bool sent = server->send_request_value(client, static_cast<std::uint16_t>(ddi), static_cast<std::uint16_t>(element));
 		logs.addLine(QString("[cmd] Request value DDI %1 element %2 -> %3.").arg(ddi).arg(element).arg(sent ? "sent" : "FAILED"));
+		if (sent) appendDdiTraffic("TC -> client", "Request", currentSelectedClient, ddi, element, 0, "manual");
 	}
 
 	void TcBridge::setValue(int ddi, int element, int value, bool acknowledge)
@@ -1024,6 +1088,7 @@ namespace agisotc
 		const bool sent = acknowledge ? server->send_set_value_and_acknowledge(client, static_cast<std::uint16_t>(ddi), static_cast<std::uint16_t>(element), static_cast<std::uint32_t>(value))
 		                              : server->send_set_value(client, static_cast<std::uint16_t>(ddi), static_cast<std::uint16_t>(element), static_cast<std::uint32_t>(value));
 		logs.addLine(QString("[cmd] Set value DDI %1 element %2 = %3%4 -> %5.").arg(ddi).arg(element).arg(value).arg(acknowledge ? " (ack)" : "").arg(sent ? "sent" : "FAILED"));
+		if (sent) appendDdiTraffic("TC -> client", acknowledge ? "Set+Ack" : "Set", currentSelectedClient, ddi, element, value, "manual");
 	}
 
 	void TcBridge::sendMeasurement(int kind, int ddi, int element, int value)
@@ -1066,6 +1131,7 @@ namespace agisotc
 				return;
 		}
 		logs.addLine(QString("[cmd] Measurement command %1 DDI %2 element %3 = %4 -> %5.").arg(kind).arg(ddi).arg(element).arg(value).arg(sent ? "sent" : "FAILED"));
+		if (sent) appendDdiTraffic("TC -> client", QString("Measurement %1").arg(kind), currentSelectedClient, ddi, element, value, "manual");
 	}
 
 	void TcBridge::setSectionDdi(int ddi)
@@ -1081,7 +1147,7 @@ namespace agisotc
 
 	void TcBridge::setSectionCount(int count)
 	{
-		count = qBound(1, count, 64);
+		count = qBound(1, count, 96);
 		if (currentSectionCount != count)
 		{
 			currentSectionCount = count;

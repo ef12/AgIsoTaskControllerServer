@@ -5,6 +5,8 @@ import QtQuick.Layouts
 GroupBox {
     title: "GPS, field and task"
 
+    signal openFieldMapRequested()
+
     ScrollView {
         anchors.fill: parent
         clip: true
@@ -67,6 +69,13 @@ GroupBox {
                     validator: DoubleValidator { bottom: -180; top: 180; decimals: 8 }
                     Layout.fillWidth: true
                 }
+            }
+
+            Button {
+                Layout.fillWidth: true
+                text: "Open field map"
+                enabled: bridge.gpsRunning
+                onClicked: openFieldMapRequested()
             }
 
             Button {
@@ -134,20 +143,66 @@ GroupBox {
                             snapMode: Dial.SnapAlways
                             wrap: false
                             onMoved: bridge.setSteeringAngle(value)
-                            background: Item {
-                                rotation: drivingWheel.value * 2.5
-                                Rectangle {
-                                    anchors.fill: parent
-                                    anchors.margins: 10
-                                    radius: width / 2
-                                    color: "transparent"
-                                    border.color: drivingWheel.pressed ? "#73c7ff" : "#c7d0dc"
-                                    border.width: 10
+                            onValueChanged: wheelCanvas.requestPaint()
+                            background: Canvas {
+                                id: wheelCanvas
+                                anchors.fill: parent
+                                onPaint: {
+                                    var ctx = getContext("2d");
+                                    var w = width, h = height;
+                                    var cx = w / 2, cy = h / 2;
+                                    var radius = Math.min(w, h) / 2 - 10;
+                                    ctx.clearRect(0, 0, w, h);
+                                    ctx.save();
+                                    ctx.translate(cx, cy);
+                                    ctx.rotate(drivingWheel.value * 2.4 * Math.PI / 180);
+
+                                    var rim = ctx.createRadialGradient(0, 0, radius * 0.72, 0, 0, radius);
+                                    rim.addColorStop(0, "#303944");
+                                    rim.addColorStop(0.62, "#11161b");
+                                    rim.addColorStop(1, drivingWheel.pressed ? "#73c7ff" : "#050709");
+                                    ctx.lineWidth = 13;
+                                    ctx.strokeStyle = rim;
+                                    ctx.beginPath();
+                                    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                                    ctx.stroke();
+
+                                    ctx.lineWidth = 3;
+                                    ctx.strokeStyle = "#5d6975";
+                                    ctx.beginPath();
+                                    ctx.arc(0, 0, radius - 7, 0, Math.PI * 2);
+                                    ctx.stroke();
+
+                                    ctx.strokeStyle = "#aeb8c4";
+                                    ctx.lineWidth = 8;
+                                    ctx.lineCap = "round";
+                                    for (var i = 0; i < 3; ++i) {
+                                        var angle = (-90 + i * 120) * Math.PI / 180;
+                                        ctx.beginPath();
+                                        ctx.moveTo(Math.cos(angle) * 14, Math.sin(angle) * 14);
+                                        ctx.lineTo(Math.cos(angle) * (radius - 18), Math.sin(angle) * (radius - 18));
+                                        ctx.stroke();
+                                    }
+
+                                    ctx.fillStyle = "#1d2630";
+                                    ctx.strokeStyle = "#73c7ff";
+                                    ctx.lineWidth = 2;
+                                    ctx.beginPath();
+                                    ctx.arc(0, 0, 18, 0, Math.PI * 2);
+                                    ctx.fill();
+                                    ctx.stroke();
+
+                                    ctx.strokeStyle = "#dfe6ee";
+                                    ctx.lineWidth = 2;
+                                    for (var tick = 0; tick < 12; ++tick) {
+                                        var tickAngle = tick * 30 * Math.PI / 180;
+                                        ctx.beginPath();
+                                        ctx.moveTo(Math.cos(tickAngle) * (radius - 5), Math.sin(tickAngle) * (radius - 5));
+                                        ctx.lineTo(Math.cos(tickAngle) * (radius + 1), Math.sin(tickAngle) * (radius + 1));
+                                        ctx.stroke();
+                                    }
+                                    ctx.restore();
                                 }
-                                Rectangle { x: parent.width / 2 - 4; y: 24; width: 8; height: parent.height / 2 - 24; radius: 4; color: "#c7d0dc" }
-                                Rectangle { x: 31; y: parent.height / 2 + 17; width: parent.width / 2 - 31; height: 8; rotation: -30; transformOrigin: Item.Right; radius: 4; color: "#c7d0dc" }
-                                Rectangle { x: parent.width / 2; y: parent.height / 2 + 17; width: parent.width / 2 - 31; height: 8; rotation: 30; transformOrigin: Item.Left; radius: 4; color: "#c7d0dc" }
-                                Rectangle { anchors.centerIn: parent; width: 30; height: 30; radius: 15; color: "#26323e"; border.color: "#73c7ff" }
                             }
                             handle: Item { }
                         }

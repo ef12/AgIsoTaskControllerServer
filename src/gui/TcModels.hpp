@@ -123,6 +123,48 @@ namespace agisotc
 		static constexpr int MAX_ROWS = 400;
 	};
 
+	struct DdiTrafficRow
+	{
+		QString timestamp;
+		QString direction;
+		QString command;
+		int address = -1;
+		int ddi = 0;
+		int element = 0;
+		qint32 value = 0;
+		QString detail;
+	};
+
+	class DdiTrafficModel : public QAbstractListModel
+	{
+		Q_OBJECT
+	public:
+		enum Roles
+		{
+			TimestampRole = Qt::UserRole + 1,
+			DirectionRole,
+			CommandRole,
+			AddressRole,
+			DdiRole,
+			ElementRole,
+			ValueRole,
+			DetailRole
+		};
+
+		explicit DdiTrafficModel(QObject *parent = nullptr);
+
+		int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+		QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+		QHash<int, QByteArray> roleNames() const override;
+
+		void addRow(const DdiTrafficRow &row);
+		void clear();
+
+	private:
+		QList<DdiTrafficRow> rows;
+		static constexpr int MAX_ROWS = 1000;
+	};
+
 	class LogModel : public QAbstractListModel
 	{
 		Q_OBJECT

@@ -70,6 +70,7 @@ namespace agisotc
 		Q_PROPERTY(QVariantList implementDdis READ implementDdis NOTIFY implementDdisChanged)
 		Q_PROPERTY(bool autoDdiSync READ autoDdiSync NOTIFY autoDdiSyncChanged)
 		Q_PROPERTY(int ddiSyncIntervalMs READ ddiSyncIntervalMs NOTIFY autoDdiSyncChanged)
+		Q_PROPERTY(bool liveDdiTrafficWatch READ liveDdiTrafficWatch NOTIFY liveDdiTrafficWatchChanged)
 		Q_PROPERTY(QVariantList tcBasicData READ tcBasicData NOTIFY implementDdisChanged)
 		Q_PROPERTY(int activeSectionCount READ activeSectionCount NOTIFY sectionStatesChanged)
 		Q_PROPERTY(double workedAreaHa READ workedAreaHa NOTIFY workChanged)
@@ -83,6 +84,7 @@ namespace agisotc
 		Q_PROPERTY(ClientListModel *clientModel READ clientModel CONSTANT)
 		Q_PROPERTY(DdopModel *ddopModel READ ddopModel CONSTANT)
 		Q_PROPERTY(ProcessDataModel *valueModel READ valueModel CONSTANT)
+		Q_PROPERTY(DdiTrafficModel *ddiTrafficModel READ ddiTrafficModel CONSTANT)
 		Q_PROPERTY(LogModel *logModel READ logModel CONSTANT)
 
 	public:
@@ -135,6 +137,7 @@ namespace agisotc
 		QVariantList implementDdis() const;
 		bool autoDdiSync() const;
 		int ddiSyncIntervalMs() const;
+		bool liveDdiTrafficWatch() const;
 		QVariantList tcBasicData() const;
 		int activeSectionCount() const;
 		double workedAreaHa() const;
@@ -148,6 +151,7 @@ namespace agisotc
 		ClientListModel *clientModel();
 		DdopModel *ddopModel();
 		ProcessDataModel *valueModel();
+		DdiTrafficModel *ddiTrafficModel();
 		LogModel *logModel();
 
 		Q_INVOKABLE bool startServer(const QString &driver, const QString &channel, int tcNumber, int booms, int sections, int channels);
@@ -178,6 +182,8 @@ namespace agisotc
 		Q_INVOKABLE void clearTrack();
 		Q_INVOKABLE void setAutoDdiSync(bool enabled);
 		Q_INVOKABLE void setDdiSyncIntervalMs(int intervalMs);
+		Q_INVOKABLE void setLiveDdiTrafficWatch(bool enabled);
+		Q_INVOKABLE void clearDdiTraffic();
 		Q_INVOKABLE void requestImplementDdis();
 		Q_INVOKABLE bool startBoundaryRecording(const QString &name);
 		Q_INVOKABLE bool finishBoundaryRecording();
@@ -203,6 +209,7 @@ namespace agisotc
 		void implementChanged();
 		void implementDdisChanged();
 		void autoDdiSyncChanged();
+		void liveDdiTrafficWatchChanged();
 		void boundaryChanged();
 		void workChanged();
 		void drivingControlsChanged();
@@ -224,6 +231,8 @@ namespace agisotc
 		void publishImplementModel();
 		void updateImplementValue(std::uint16_t ddi, std::uint16_t element, std::int32_t value);
 		void serviceDdiSync();
+		void appendDdiTraffic(const QString &direction, const QString &command, int address, int ddi, int element,
+		                      std::int32_t value, const QString &detail);
 		void updateTrailerPose(double elapsedSeconds);
 		void updateWorkCoverage(double elapsedSeconds);
 		void rebuildFieldBoundaryPoints();
@@ -239,6 +248,7 @@ namespace agisotc
 		ClientListModel clients;
 		DdopModel ddop;
 		ProcessDataModel values;
+		DdiTrafficModel ddiTraffic;
 		LogModel logs;
 
 		bool running = false;
@@ -318,6 +328,7 @@ namespace agisotc
 		std::vector<ImplementDdiState> implementDdiStates;
 		bool autoDdiSyncEnabled = true;
 		int currentDdiSyncIntervalMs = 1000;
+		bool liveDdiTrafficWatchEnabled = false;
 		std::uint64_t lastDdiSyncMs = 0;
 		std::size_t nextDdiSyncIndex = 0;
 		QVariantList currentTcBasicData;

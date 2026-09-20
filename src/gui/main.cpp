@@ -25,6 +25,7 @@ int main(int argc, char *argv[])
 	engine.rootContext()->setContextProperty("clientModel", bridge.clientModel());
 	engine.rootContext()->setContextProperty("ddopModel", bridge.ddopModel());
 	engine.rootContext()->setContextProperty("valueModel", bridge.valueModel());
+	engine.rootContext()->setContextProperty("ddiTrafficModel", bridge.ddiTrafficModel());
 	engine.rootContext()->setContextProperty("logModel", bridge.logModel());
 
 	engine.load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
