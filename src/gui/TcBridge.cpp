@@ -637,6 +637,9 @@ namespace agisotc
 			else
 			{
 				buildImplementModel(pool);
+				// Pull live values immediately so the Raw tab fills without
+				// waiting for the trickle sync; quiet implements only answer.
+				requestImplementDdis();
 				rows.push_back({ 0, QString("%1 objects (%2 bytes)").arg(pool.size()).arg(binary.size()) });
 				for (std::uint16_t i = 0; i < pool.size(); ++i)
 				{
@@ -1470,6 +1473,8 @@ namespace agisotc
 		emit tasksChanged();
 		setStatus(QString("Task '%1' is active.").arg(currentActiveTaskName));
 		logs.addLine(QString("[task] Started %1.").arg(currentActiveTaskName));
+		// Many implements only report process data while a task is active.
+		requestImplementDdis();
 	}
 
 	void TcBridge::pauseSelectedTask()
