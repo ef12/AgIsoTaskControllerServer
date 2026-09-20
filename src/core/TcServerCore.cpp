@@ -100,6 +100,7 @@ namespace agisotc
 		std::lock_guard<std::mutex> lock(mutex);
 		auto &record = touch_locked(clientControlFunction);
 		record.snapshot.ddopActive = false;
+		record.poolComplete = false; // Next upload starts a fresh reassembly, kept bytes stay viewable.
 		rosterDirty = true;
 		log_locked("DDOP deactivated by client at address " + std::to_string(record.snapshot.address));
 		return true;
@@ -111,6 +112,7 @@ namespace agisotc
 		std::lock_guard<std::mutex> lock(mutex);
 		auto &record = touch_locked(clientControlFunction);
 		record.storedPool.clear();
+		record.poolComplete = false;
 		record.snapshot.ddopActive = false;
 		rosterDirty = true;
 		returnedErrorCode = ObjectPoolDeletionErrors::ErrorDetailsNotAvailable;
@@ -168,6 +170,7 @@ namespace agisotc
 		auto &record = touch_locked(clientControlFunction);
 		record.snapshot.ddopActive = false;
 		record.snapshot.timedOut = true;
+		record.poolComplete = false;
 		rosterDirty = true;
 		log_locked("Client at address " + std::to_string(record.snapshot.address) + " timed out");
 	}
@@ -229,15 +232,43 @@ namespace agisotc
 	{
 		std::lock_guard<std::mutex> lock(mutex);
 		auto &record = touch_locked(clientControlFunction);
-		if (!appendToPool)
+
+		// The stack reports append=false for every segment (its segment counter
+		// is never incremented), so large pools would arrive here as a series
+		// of overwriting chunks. Reassemble multi-segment uploads ourselves
+		// using the total size the client announced in RequestObjectPoolTransfer.
+		auto activeClient = get_active_client(clientControlFunction);
+		const std::uint32_t expectedBytes = (nullptr != activeClient) ? activeClient->clientDDOPsize_bytes : 0;
+		if (expectedBytes > 0)
 		{
-			record.storedPool.clear();
+			const bool startOver = record.poolComplete ||
+				(record.storedPool.size() + objectPoolData.size() > expectedBytes);
+			if (startOver)
+			{
+				record.storedPool.clear();
+				record.poolComplete = false;
+			}
+			record.storedPool.insert(record.storedPool.end(), objectPoolData.begin(), objectPoolData.end());
+			record.poolComplete = (record.storedPool.size() >= expectedBytes);
 		}
-		record.storedPool.insert(record.storedPool.end(), objectPoolData.begin(), objectPoolData.end());
-		pendingPoolsChanged.push_back(record.snapshot.address);
-		log_locked("Stored " + std::to_string(objectPoolData.size()) + " DDOP bytes from client at address " +
-		           std::to_string(record.snapshot.address) + (appendToPool ? " (appended)" : " (new)") +
-		           ", total " + std::to_string(record.storedPool.size()));
+		else
+		{
+			if (!appendToPool)
+			{
+				record.storedPool.clear();
+			}
+			record.storedPool.insert(record.storedPool.end(), objectPoolData.begin(), objectPoolData.end());
+			record.poolComplete = true;
+		}
+
+		if (record.poolComplete)
+		{
+			pendingPoolsChanged.push_back(record.snapshot.address);
+		}
+		log_locked("DDOP segment (" + std::to_string(objectPoolData.size()) + " bytes) from client at address " +
+		           std::to_string(record.snapshot.address) + ", accumulated " +
+		           std::to_string(record.storedPool.size()) + " of " + std::to_string(expectedBytes) +
+		           (record.poolComplete ? " (complete)" : " (waiting for more)"));
 		return true;
 	}
 
@@ -294,6 +325,7 @@ namespace agisotc
 			if (entry.second.snapshot.address == address)
 			{
 				entry.second.storedPool.clear();
+				entry.second.poolComplete = false;
 				pendingPoolsChanged.push_back(address);
 				log_locked("Stored DDOP copy discarded for client at address " + std::to_string(address));
 			}

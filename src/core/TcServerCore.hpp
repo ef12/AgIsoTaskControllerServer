@@ -149,6 +149,7 @@ namespace agisotc
 			std::shared_ptr<isobus::ControlFunction> controlFunction;
 			ClientSnapshot snapshot;
 			std::vector<std::uint8_t> storedPool;
+			bool poolComplete = false; ///< True once a full multi-segment upload was reassembled.
 		};
 
 		ClientRecord &touch_locked(std::shared_ptr<isobus::ControlFunction> clientControlFunction);

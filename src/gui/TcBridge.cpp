@@ -622,8 +622,8 @@ namespace agisotc
 		}
 		else if (binary.empty())
 		{
-			rows.push_back({ 0, "No DDOP stored for this client." });
-			rows.push_back({ 0, "It appears here once the client stores its pool to NVM," });
+			rows.push_back({ 0, "No DDOP received from this client yet." });
+			rows.push_back({ 0, "It appears here automatically once the client uploads its pool," });
 			rows.push_back({ 0, "or load a pool file manually with the button below." });
 		}
 		else

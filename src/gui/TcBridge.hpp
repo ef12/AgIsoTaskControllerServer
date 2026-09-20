@@ -335,7 +335,7 @@ namespace agisotc
 		std::vector<ImplementDdiState> implementDdiStates;
 		bool autoDdiSyncEnabled = true;
 		int currentDdiSyncIntervalMs = 1000;
-		bool liveDdiTrafficWatchEnabled = false;
+		bool liveDdiTrafficWatchEnabled = true;
 		std::uint64_t lastDdiSyncMs = 0;
 		std::size_t nextDdiSyncIndex = 0;
 		QVariantList currentTcBasicData;
