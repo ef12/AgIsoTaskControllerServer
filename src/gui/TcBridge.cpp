@@ -8,6 +8,9 @@
 
 #include <QDateTime>
 #include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QVariantMap>
 
 #include "isobus/isobus/can_general_parameter_group_numbers.hpp"
@@ -1711,6 +1714,196 @@ namespace agisotc
 	{
 		currentTrackPoints.clear();
 		emit trackChanged();
+	}
+
+	namespace
+	{
+		QJsonArray encodeRing(const std::vector<std::pair<double, double>> &ring)
+		{
+			QJsonArray out;
+			for (const auto &[latitude, longitude] : ring)
+			{
+				QJsonArray point;
+				point.push_back(latitude);
+				point.push_back(longitude);
+				out.push_back(point);
+			}
+			return out;
+		}
+
+		std::vector<std::pair<double, double>> decodeRing(const QJsonArray &ring)
+		{
+			std::vector<std::pair<double, double>> out;
+			for (const auto &entry : ring)
+			{
+				const auto point = entry.toArray();
+				if (point.size() >= 2)
+				{
+					out.emplace_back(point.at(0).toDouble(), point.at(1).toDouble());
+				}
+			}
+			return out;
+		}
+	} // namespace
+
+	void TcBridge::saveFields(const QUrl &fileUrl)
+	{
+		QJsonArray fields;
+		for (const auto &field : fieldTaskManager.list_fields())
+		{
+			QJsonObject object;
+			object["id"] = QString::fromStdString(field.id);
+			object["name"] = QString::fromStdString(field.name);
+			object["createdMs"] = static_cast<qint64>(field.createdMs);
+			object["areaHectares"] = field.areaHectares;
+			object["exteriorRing"] = encodeRing(field.exteriorRing);
+			QJsonArray holes;
+			for (const auto &hole : field.interiorRings)
+			{
+				holes.push_back(encodeRing(hole));
+			}
+			object["interiorRings"] = holes;
+			fields.push_back(object);
+		}
+		QJsonDocument document(QJsonObject{ { "fields", fields } });
+		QFile file(fileUrl.toLocalFile());
+		if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+		{
+			setStatus("Could not write field file.");
+			return;
+		}
+		file.write(document.toJson(QJsonDocument::Indented));
+		setStatus(QString("Saved %1 field(s).").arg(fields.size()));
+		logs.addLine(QString("[field] Saved %1 field(s) to %2.").arg(fields.size()).arg(fileUrl.fileName()));
+	}
+
+	void TcBridge::loadFields(const QUrl &fileUrl)
+	{
+		QFile file(fileUrl.toLocalFile());
+		if (!file.open(QIODevice::ReadOnly))
+		{
+			setStatus("Could not open field file.");
+			return;
+		}
+		const auto document = QJsonDocument::fromJson(file.readAll());
+		if (!document.isObject())
+		{
+			setStatus("Field file is not valid JSON.");
+			return;
+		}
+		int loaded = 0;
+		for (const auto &entry : document.object().value("fields").toArray())
+		{
+			const auto object = entry.toObject();
+			FieldBoundary field;
+			field.id = object.value("id").toString().toStdString();
+			field.name = object.value("name").toString().toStdString();
+			field.createdMs = static_cast<std::uint64_t>(object.value("createdMs").toVariant().toLongLong());
+			field.areaHectares = object.value("areaHectares").toDouble();
+			field.exteriorRing = decodeRing(object.value("exteriorRing").toArray());
+			for (const auto &hole : object.value("interiorRings").toArray())
+			{
+				field.interiorRings.push_back(decodeRing(hole.toArray()));
+			}
+			if (field.exteriorRing.size() >= 3)
+			{
+				fieldTaskManager.add_field(field);
+				++loaded;
+			}
+		}
+		refreshFieldNames();
+		rebuildFieldBoundaryPoints();
+		setStatus(QString("Loaded %1 field(s).").arg(loaded));
+		logs.addLine(QString("[field] Loaded %1 field(s) from %2.").arg(loaded).arg(fileUrl.fileName()));
+	}
+
+	void TcBridge::saveTasks(const QUrl &fileUrl)
+	{
+		QJsonArray tasks;
+		for (const auto &task : fieldTaskManager.list_tasks())
+		{
+			QJsonObject object;
+			object["id"] = QString::fromStdString(task.id);
+			object["name"] = QString::fromStdString(task.name);
+			object["fieldId"] = QString::fromStdString(task.fieldId);
+			object["clientId"] = QString::fromStdString(task.clientId);
+			object["createdMs"] = static_cast<qint64>(task.createdMs);
+			object["startedMs"] = static_cast<qint64>(task.startedMs);
+			object["stoppedMs"] = static_cast<qint64>(task.stoppedMs);
+			object["state"] = static_cast<int>(task.state);
+			object["logIntervalMs"] = static_cast<qint64>(task.logIntervalMs);
+			QJsonArray ddis;
+			for (const auto ddi : task.ddIsToLog)
+			{
+				ddis.push_back(static_cast<int>(ddi));
+			}
+			object["ddIsToLog"] = ddis;
+			tasks.push_back(object);
+		}
+		QJsonDocument document(QJsonObject{ { "tasks", tasks } });
+		QFile file(fileUrl.toLocalFile());
+		if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+		{
+			setStatus("Could not write task file.");
+			return;
+		}
+		file.write(document.toJson(QJsonDocument::Indented));
+		setStatus(QString("Saved %1 task(s).").arg(tasks.size()));
+		logs.addLine(QString("[task] Saved %1 task(s) to %2.").arg(tasks.size()).arg(fileUrl.fileName()));
+	}
+
+	void TcBridge::loadTasks(const QUrl &fileUrl)
+	{
+		QFile file(fileUrl.toLocalFile());
+		if (!file.open(QIODevice::ReadOnly))
+		{
+			setStatus("Could not open task file.");
+			return;
+		}
+		const auto document = QJsonDocument::fromJson(file.readAll());
+		if (!document.isObject())
+		{
+			setStatus("Task file is not valid JSON.");
+			return;
+		}
+		int loaded = 0;
+		int skipped = 0;
+		for (const auto &entry : document.object().value("tasks").toArray())
+		{
+			const auto object = entry.toObject();
+			Task task;
+			task.id = object.value("id").toString().toStdString();
+			task.name = object.value("name").toString().toStdString();
+			task.fieldId = object.value("fieldId").toString().toStdString();
+			task.clientId = object.value("clientId").toString().toStdString();
+			task.createdMs = static_cast<std::uint64_t>(object.value("createdMs").toVariant().toLongLong());
+			task.startedMs = static_cast<std::uint64_t>(object.value("startedMs").toVariant().toLongLong());
+			task.stoppedMs = static_cast<std::uint64_t>(object.value("stoppedMs").toVariant().toLongLong());
+			task.logIntervalMs = static_cast<std::uint32_t>(object.value("logIntervalMs").toVariant().toLongLong());
+			for (const auto ddi : object.value("ddIsToLog").toArray())
+			{
+				task.ddIsToLog.push_back(static_cast<std::uint16_t>(ddi.toInt()));
+			}
+			// Never restore a live state; loaded tasks always start as created.
+			task.state = Task::State::Created;
+			if (!task.name.empty() && !fieldTaskManager.create_task(task).empty())
+			{
+				++loaded;
+			}
+			else
+			{
+				// Usually a task whose field has not been loaded (yet).
+				++skipped;
+			}
+		}
+		refreshTaskNames();
+		setStatus(skipped > 0
+		            ? QString("Loaded %1 task(s), %2 skipped (load their fields first).").arg(loaded).arg(skipped)
+		            : QString("Loaded %1 task(s).").arg(loaded));
+		logs.addLine(QString("[task] Loaded %1 task(s)%2 from %3.")
+		               .arg(loaded)
+		               .arg(skipped > 0 ? QString(", %1 skipped (missing field)").arg(skipped) : QString())
+		               .arg(fileUrl.fileName()));
 	}
 
 	bool TcBridge::startBoundaryRecording(const QString &name)
