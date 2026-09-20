@@ -13,6 +13,7 @@
 #include "isobus/isobus/can_message.hpp"
 #include "isobus/isobus/can_network_manager.hpp"
 #include "isobus/isobus/isobus_device_descriptor_object_pool.hpp"
+#include "isobus/isobus/isobus_speed_distance_messages.hpp"
 #include "isobus/isobus/isobus_task_controller_client_objects.hpp"
 #include "isobus/isobus/isobus_standard_data_description_indices.hpp"
 
@@ -360,6 +361,18 @@ namespace agisotc
 		}
 		registerGpsCanCallbacks();
 
+		// Broadcast our GPS/simulated motion as machine speed so implements
+		// and terminals on the bus pick up speed and distance. We sense the
+		// speed ourselves (GPS/simulator), hence periodic transmission of the
+		// ground-based, wheel-based, and machine-selected speed messages.
+		speedMessages = std::make_unique<isobus::SpeedMessagesInterface>(
+		  canBus.internal_control_function(),
+		  true,
+		  true,
+		  true,
+		  false);
+		speedMessages->initialize();
+
 		auto options = isobus::TaskControllerOptions()
 		                 .with_documentation()
 		                 .with_implement_section_control()
@@ -402,6 +415,7 @@ namespace agisotc
 			server->terminate();
 			server.reset();
 		}
+		speedMessages.reset();
 		unregisterGpsCanCallbacks();
 		canBus.stop();
 		for (auto &state : implementDdiStates) state.reportingConfigured = false;
@@ -1702,6 +1716,39 @@ namespace agisotc
 		emit workChanged();
 	}
 
+	void TcBridge::updateSpeedMessages(double elapsedSeconds)
+	{
+		if (nullptr == speedMessages)
+		{
+			return;
+		}
+		static constexpr std::uint16_t SPEED_NOT_AVAILABLE = 0xFFFF;
+
+		// Publish our sensed motion (GPS, driven by real receiver or simulator)
+		// as ground-based, wheel-based, and machine-selected speed so that
+		// implements and terminals on the bus pick up speed and distance.
+		std::uint16_t speedMmPerSec = SPEED_NOT_AVAILABLE;
+		auto direction = isobus::SpeedMessagesInterface::MachineDirection::NotAvailable;
+		if (currentGps.valid && currentGps.speedMps.has_value())
+		{
+			const double speedMps = std::max(0.0, *currentGps.speedMps);
+			speedMmPerSec = static_cast<std::uint16_t>(std::min<double>(SPEED_NOT_AVAILABLE - 1, speedMps * 1000.0));
+			direction = isobus::SpeedMessagesInterface::MachineDirection::Forward;
+			currentMachineDistanceMm += static_cast<std::uint32_t>(speedMps * 1000.0 * elapsedSeconds);
+		}
+
+		speedMessages->groundBasedSpeedTransmitData.set_machine_speed(speedMmPerSec);
+		speedMessages->groundBasedSpeedTransmitData.set_machine_distance(currentMachineDistanceMm);
+		speedMessages->groundBasedSpeedTransmitData.set_machine_direction_of_travel(direction);
+		speedMessages->wheelBasedSpeedTransmitData.set_machine_speed(speedMmPerSec);
+		speedMessages->wheelBasedSpeedTransmitData.set_machine_distance(currentMachineDistanceMm);
+		speedMessages->wheelBasedSpeedTransmitData.set_machine_direction_of_travel(direction);
+		speedMessages->machineSelectedSpeedTransmitData.set_machine_speed(speedMmPerSec);
+		speedMessages->machineSelectedSpeedTransmitData.set_machine_distance(currentMachineDistanceMm);
+		speedMessages->machineSelectedSpeedTransmitData.set_machine_direction_of_travel(direction);
+		speedMessages->update();
+	}
+
 	void TcBridge::updateGps()
 	{
 		if (!gpsRunningFlag)
@@ -1781,6 +1828,7 @@ namespace agisotc
 		updateWorkCoverage(elapsedSeconds);
 		fieldTaskManager.on_position_update(solution);
 		emit gpsChanged();
+		updateSpeedMessages(elapsedSeconds);
 	}
 
 	void TcBridge::refreshFieldNames()

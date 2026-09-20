@@ -28,6 +28,7 @@ namespace isobus
 {
 	class CANMessage;
 	class DeviceDescriptorObjectPool;
+	class SpeedMessagesInterface;
 }
 
 namespace agisotc
@@ -236,6 +237,7 @@ namespace agisotc
 		                      std::int32_t value, const QString &detail);
 		void updateTrailerPose(double elapsedSeconds);
 		void updateWorkCoverage(double elapsedSeconds);
+		void updateSpeedMessages(double elapsedSeconds);
 		void rebuildFieldBoundaryPoints();
 		static void processGpsCanMessage(const isobus::CANMessage &message, void *parentPointer);
 
@@ -243,6 +245,7 @@ namespace agisotc
 		GpsProvider gpsProvider;
 		FieldTaskManager fieldTaskManager;
 		std::shared_ptr<GuiTaskControllerServer> server;
+		std::unique_ptr<isobus::SpeedMessagesInterface> speedMessages;
 		std::thread pumpThread;
 		std::atomic_bool pumpRunning = { false };
 
@@ -341,6 +344,7 @@ namespace agisotc
 		double currentImplementX = 0.0;
 		double currentImplementZ = 0.0;
 		double currentImplementCourse = 0.0;
+		std::uint32_t currentMachineDistanceMm = 0;
 		std::uint64_t lastMotionUpdateMs = 0;
 		bool trailerPoseValid = false;
 		double lastCoverageX = 0.0;
