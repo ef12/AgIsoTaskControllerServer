@@ -188,6 +188,7 @@ namespace agisotc
 		Q_INVOKABLE bool startBoundaryRecording(const QString &name);
 		Q_INVOKABLE bool finishBoundaryRecording();
 		Q_INVOKABLE void cancelBoundaryRecording();
+		Q_INVOKABLE bool createFieldFromLocalBoundary(const QString &name, const QVariantList &points);
 		Q_INVOKABLE void setSteeringAngle(double degrees);
 		Q_INVOKABLE void setThrottleKph(double speedKph);
 		Q_INVOKABLE void adjustThrottle(double deltaKph);

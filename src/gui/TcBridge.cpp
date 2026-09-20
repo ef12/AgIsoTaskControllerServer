@@ -1524,6 +1524,67 @@ namespace agisotc
 		setStatus("Field perimeter recording cancelled.");
 	}
 
+	bool TcBridge::createFieldFromLocalBoundary(const QString &name, const QVariantList &points)
+	{
+		if (name.trimmed().isEmpty())
+		{
+			setStatus("Enter a field name before creating a drawn field.");
+			return false;
+		}
+		if (points.size() < 3)
+		{
+			setStatus("Draw at least three boundary points before creating a field.");
+			return false;
+		}
+		if (!fieldOriginValid)
+		{
+			if (currentGps.valid && currentGps.latitudeDeg && currentGps.longitudeDeg)
+			{
+				fieldOriginLatitude = *currentGps.latitudeDeg;
+				fieldOriginLongitude = *currentGps.longitudeDeg;
+			}
+			else
+			{
+				fieldOriginLatitude = 52.0;
+				fieldOriginLongitude = 5.0;
+				logs.addLine("[field] No GPS origin was available; drawn field saved around the default origin 52.0, 5.0.");
+			}
+			fieldOriginValid = true;
+		}
+
+		FieldBoundary field;
+		field.name = name.trimmed().toStdString();
+		field.exteriorRing.reserve(static_cast<std::size_t>(points.size() + 1));
+		for (const auto &variant : points)
+		{
+			const QVariantMap point = variant.toMap();
+			const double x = point.value("x").toDouble();
+			const double z = point.value("z").toDouble();
+			const double latitude = fieldOriginLatitude - ((z / EarthRadiusM) / DegreesToRadians);
+			const double longitudeScale = std::max(0.01, std::cos(fieldOriginLatitude * DegreesToRadians));
+			const double longitude = fieldOriginLongitude + ((x / (EarthRadiusM * longitudeScale)) / DegreesToRadians);
+			field.exteriorRing.emplace_back(latitude, longitude);
+		}
+		if (field.exteriorRing.front() != field.exteriorRing.back())
+		{
+			field.exteriorRing.push_back(field.exteriorRing.front());
+		}
+		const auto fieldId = fieldTaskManager.add_field(field);
+		if (fieldId.empty())
+		{
+			setStatus("The drawn field boundary could not be saved.");
+			return false;
+		}
+		boundaryRecordingFlag = false;
+		recordedBoundary.clear();
+		refreshFieldNames();
+		const auto selected = std::find(fieldIds.begin(), fieldIds.end(), fieldId);
+		selectField(static_cast<int>(std::distance(fieldIds.begin(), selected)));
+		setStatus(QString("Drawn field '%1' saved with %2 boundary points.").arg(name.trimmed()).arg(points.size()));
+		logs.addLine(QString("[field] Created drawn field %1 from %2 points.").arg(name.trimmed()).arg(points.size()));
+		return true;
+	}
+
 	void TcBridge::setSteeringAngle(double degrees)
 	{
 		degrees = std::clamp(degrees, -40.0, 40.0);

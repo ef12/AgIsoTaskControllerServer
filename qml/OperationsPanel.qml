@@ -279,26 +279,10 @@ GroupBox {
                 onClicked: bridge.createField(fieldName.text, fieldWidth.value, fieldLength.value)
             }
 
-            Label { text: "Record perimeter by driving"; color: "#c7d0dc"; font.bold: true }
-            RowLayout {
+            Button {
                 Layout.fillWidth: true
-                Button {
-                    Layout.fillWidth: true
-                    text: bridge.boundaryRecording ? "Recording… " + bridge.boundaryPointCount + " points" : "Start perimeter"
-                    enabled: bridge.gpsValid && !bridge.boundaryRecording
-                    highlighted: !bridge.boundaryRecording
-                    onClicked: bridge.startBoundaryRecording(fieldName.text)
-                }
-                Button {
-                    text: "Finish"
-                    enabled: bridge.boundaryRecording && bridge.boundaryPointCount >= 3
-                    onClicked: bridge.finishBoundaryRecording()
-                }
-                Button {
-                    text: "Cancel"
-                    enabled: bridge.boundaryRecording
-                    onClicked: bridge.cancelBoundaryRecording()
-                }
+                text: "Draw field boundary"
+                onClicked: openFieldMapRequested()
             }
 
             Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: "#3b4652" }

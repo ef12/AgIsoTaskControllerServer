@@ -5,6 +5,8 @@ import QtQuick.Layouts
 RowLayout {
     spacing: 8
 
+    signal openTaskDataRequested()
+
     Label {
         text: "Driver:"
         color: "#c7d0dc"
@@ -88,6 +90,10 @@ RowLayout {
         text: bridge.taskActive ? "Stop task" : "Start task"
         enabled: bridge.selectedTaskIndex >= 0
         onClicked: bridge.setTaskActive(!bridge.taskActive)
+    }
+    Button {
+        text: "TC data"
+        onClicked: openTaskDataRequested()
     }
     Item {
         Layout.fillWidth: true

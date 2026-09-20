@@ -5,6 +5,7 @@
     <file>qml/ClientsPanel.qml</file>
     <file>qml/DdopPanel.qml</file>
     <file>qml/ProcessDataPanel.qml</file>
+    <file>qml/ProcessDataWindow.qml</file>
     <file>qml/CommandPanel.qml</file>
     <file>qml/SectionView3D.qml</file>
     <file>qml/OperationsPanel.qml</file>

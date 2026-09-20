@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Detached field-operation window: 2D map, section strip, recording controls.
+// Detached field-operation window: 2D map, section strip, and field drawing controls.
 Window {
     id: root
     visible: false
@@ -22,6 +22,8 @@ Window {
             id: fieldMap
             Layout.fillWidth: true
             Layout.fillHeight: true
+            drawMode: drawModeBox.checked
+            nudgeStepM: Number(nudgeStepBox.currentText)
         }
 
         RowLayout {
@@ -33,26 +35,38 @@ Window {
             }
 
             GroupBox {
-                title: "Perimeter"
+                title: "Draw field"
                 RowLayout {
                     anchors.fill: parent
-                    Button {
-                        text: bridge.boundaryRecording
-                              ? "Recording… " + bridge.boundaryPointCount
-                              : "Start perimeter"
-                        enabled: bridge.gpsValid && !bridge.boundaryRecording
-                        onClicked: bridge.startBoundaryRecording(
-                                       bridge.fieldNames.length > 0 ? bridge.fieldNames[0] : "Field 1")
+                    CheckBox {
+                        id: drawModeBox
+                        text: "Draw"
+                        checked: true
+                    }
+                    Label { text: "Nudge m"; color: "#c7d0dc" }
+                    ComboBox {
+                        id: nudgeStepBox
+                        model: ["0.01", "0.05", "0.1", "0.5", "1", "5"]
+                        currentIndex: 2
+                        Layout.preferredWidth: 82
                     }
                     Button {
-                        text: "Finish"
-                        enabled: bridge.boundaryRecording && bridge.boundaryPointCount >= 3
-                        onClicked: bridge.finishBoundaryRecording()
+                        text: "Create field"
+                        enabled: fieldMap.draftPoints.length >= 3
+                        onClicked: {
+                            if (bridge.createFieldFromLocalBoundary(fieldNameField.text, fieldMap.draftPoints))
+                                fieldMap.clearDraft()
+                        }
                     }
                     Button {
-                        text: "Cancel"
-                        enabled: bridge.boundaryRecording
-                        onClicked: bridge.cancelBoundaryRecording()
+                        text: "Clear"
+                        enabled: fieldMap.draftPoints.length > 0
+                        onClicked: fieldMap.clearDraft()
+                    }
+                    TextField {
+                        id: fieldNameField
+                        text: bridge.fieldNames.length > 0 ? bridge.fieldNames[0] : "Field 1"
+                        Layout.preferredWidth: 160
                     }
                 }
             }

@@ -10,12 +10,56 @@ Item {
 
     property real scale: 3.0 // pixels per meter
     property bool follow: true
+    property bool drawMode: false
+    property var draftPoints: []
+    property int selectedDraftPoint: -1
+    property real nudgeStepM: 0.1
 
     property real viewX: bridge.tractorX
     property real viewZ: bridge.tractorZ
 
     function toScreenX(x) { return width / 2 + (x - viewX) * scale; }
     function toScreenZ(z) { return height / 2 + (z - viewZ) * scale; }
+    function fromScreenX(x) { return viewX + (x - width / 2) / scale; }
+    function fromScreenZ(y) { return viewZ + (y - height / 2) / scale; }
+    function repaint() { mapCanvas.requestPaint(); }
+    function clearDraft() {
+        draftPoints = [];
+        selectedDraftPoint = -1;
+        repaint();
+    }
+    function addDraftPoint(localX, localZ) {
+        var points = draftPoints.slice();
+        points.push({ "x": localX, "z": localZ });
+        draftPoints = points;
+        selectedDraftPoint = points.length - 1;
+        repaint();
+    }
+    function moveSelectedDraftPoint(dx, dz) {
+        if (selectedDraftPoint < 0 || selectedDraftPoint >= draftPoints.length)
+            return;
+        var points = draftPoints.slice();
+        points[selectedDraftPoint] = {
+            "x": points[selectedDraftPoint].x + dx,
+            "z": points[selectedDraftPoint].z + dz
+        };
+        draftPoints = points;
+        repaint();
+    }
+    function nearestDraftPoint(screenX, screenY) {
+        var best = -1;
+        var bestDistance = 12 * 12;
+        for (var i = 0; i < draftPoints.length; ++i) {
+            var dx = toScreenX(draftPoints[i].x) - screenX;
+            var dy = toScreenZ(draftPoints[i].z) - screenY;
+            var distance = dx * dx + dy * dy;
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = i;
+            }
+        }
+        return best;
+    }
 
     Timer {
         interval: 200
@@ -68,6 +112,35 @@ Item {
                 ctx.strokeStyle = bridge.boundaryRecording ? "#f2d33c" : "#35c759";
                 ctx.lineWidth = 2;
                 ctx.stroke();
+            }
+
+            // Draft field polygon drawn by mouse.
+            if (root.draftPoints.length > 0) {
+                ctx.beginPath();
+                for (var dp = 0; dp < root.draftPoints.length; ++dp) {
+                    var draft = root.draftPoints[dp];
+                    var dsx = root.toScreenX(draft.x), dsy = root.toScreenZ(draft.z);
+                    if (dp === 0) ctx.moveTo(dsx, dsy);
+                    else ctx.lineTo(dsx, dsy);
+                }
+                if (root.draftPoints.length >= 3)
+                    ctx.closePath();
+                ctx.fillStyle = "rgba(115, 199, 255, 0.08)";
+                ctx.strokeStyle = "#73c7ff";
+                ctx.lineWidth = 2;
+                if (root.draftPoints.length >= 3) ctx.fill();
+                ctx.stroke();
+                for (var hp = 0; hp < root.draftPoints.length; ++hp) {
+                    var handle = root.draftPoints[hp];
+                    var hx = root.toScreenX(handle.x), hy = root.toScreenZ(handle.z);
+                    ctx.fillStyle = hp === root.selectedDraftPoint ? "#f2d33c" : "#dce8f5";
+                    ctx.strokeStyle = "#0d1117";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(hx, hy, hp === root.selectedDraftPoint ? 7 : 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
             }
 
             // Worked swaths (decimated for speed)
@@ -180,21 +253,76 @@ Item {
         }
     }
 
-    // Pan by dragging when not following
     MouseArea {
+        id: mapMouse
         anchors.fill: parent
-        enabled: !root.follow
+        focus: true
+        enabled: true
         property real lastX: 0
         property real lastY: 0
-        onPressed: function (mouse) { lastX = mouse.x; lastY = mouse.y; }
+        property bool draggingDraftPoint: false
+        onPressed: function (mouse) {
+            forceActiveFocus();
+            lastX = mouse.x;
+            lastY = mouse.y;
+            draggingDraftPoint = false;
+            if (root.drawMode) {
+                var nearest = root.nearestDraftPoint(mouse.x, mouse.y);
+                if (nearest >= 0) {
+                    root.selectedDraftPoint = nearest;
+                    draggingDraftPoint = true;
+                } else {
+                    root.addDraftPoint(root.fromScreenX(mouse.x), root.fromScreenZ(mouse.y));
+                }
+                mouse.accepted = true;
+            }
+        }
         onPositionChanged: function (mouse) {
-            root.viewX -= (mouse.x - lastX) / root.scale;
-            root.viewZ -= (mouse.y - lastY) / root.scale;
+            if (root.drawMode && draggingDraftPoint && root.selectedDraftPoint >= 0) {
+                var points = root.draftPoints.slice();
+                points[root.selectedDraftPoint] = {
+                    "x": root.fromScreenX(mouse.x),
+                    "z": root.fromScreenZ(mouse.y)
+                };
+                root.draftPoints = points;
+                root.repaint();
+            } else if (!root.follow && (mouse.buttons & Qt.LeftButton)) {
+                root.viewX -= (mouse.x - lastX) / root.scale;
+                root.viewZ -= (mouse.y - lastY) / root.scale;
+                root.repaint();
+            }
             lastX = mouse.x; lastY = mouse.y;
         }
+        onReleased: draggingDraftPoint = false
         onWheel: function (wheel) {
             if (wheel.angleDelta.y > 0) root.scale = Math.min(30, root.scale * 1.15);
             else root.scale = Math.max(0.5, root.scale / 1.15);
+            root.repaint();
+        }
+        Keys.onPressed: function(event) {
+            if (!root.drawMode)
+                return;
+            if (event.key === Qt.Key_Left) {
+                root.moveSelectedDraftPoint(-root.nudgeStepM, 0);
+                event.accepted = true;
+            } else if (event.key === Qt.Key_Right) {
+                root.moveSelectedDraftPoint(root.nudgeStepM, 0);
+                event.accepted = true;
+            } else if (event.key === Qt.Key_Up) {
+                root.moveSelectedDraftPoint(0, -root.nudgeStepM);
+                event.accepted = true;
+            } else if (event.key === Qt.Key_Down) {
+                root.moveSelectedDraftPoint(0, root.nudgeStepM);
+                event.accepted = true;
+            } else if ((event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) &&
+                       root.selectedDraftPoint >= 0 && root.selectedDraftPoint < root.draftPoints.length) {
+                var points = root.draftPoints.slice();
+                points.splice(root.selectedDraftPoint, 1);
+                root.draftPoints = points;
+                root.selectedDraftPoint = Math.min(root.selectedDraftPoint, points.length - 1);
+                root.repaint();
+                event.accepted = true;
+            }
         }
     }
 

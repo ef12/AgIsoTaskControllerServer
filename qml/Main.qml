@@ -37,6 +37,10 @@ ApplicationWindow {
         id: mapWindow
     }
 
+    ProcessDataWindow {
+        id: processDataWindow
+    }
+
     Rectangle {
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
@@ -63,6 +67,10 @@ ApplicationWindow {
 
         TopBar {
             Layout.fillWidth: true
+            onOpenTaskDataRequested: {
+                processDataWindow.visible = true
+                processDataWindow.requestActivate()
+            }
         }
 
         RowLayout {
