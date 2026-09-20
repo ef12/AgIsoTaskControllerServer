@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 
 GroupBox {
@@ -285,6 +286,21 @@ GroupBox {
                 onClicked: openFieldMapRequested()
             }
 
+            RowLayout {
+                Layout.fillWidth: true
+                Button {
+                    Layout.fillWidth: true
+                    text: "Save fields…"
+                    enabled: bridge.fieldNames.length > 0
+                    onClicked: saveFieldsDialog.open()
+                }
+                Button {
+                    Layout.fillWidth: true
+                    text: "Load fields…"
+                    onClicked: loadFieldsDialog.open()
+                }
+            }
+
             Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: "#3b4652" }
             Label { text: "Task"; color: "#73c7ff"; font.bold: true }
             ComboBox {
@@ -334,6 +350,57 @@ GroupBox {
                 color: bridge.taskActive ? "#35c759" : "#8995a3"
                 elide: Text.ElideRight
             }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Button {
+                    Layout.fillWidth: true
+                    text: "Save tasks…"
+                    enabled: bridge.taskNames.length > 0
+                    onClicked: saveTasksDialog.open()
+                }
+                Button {
+                    Layout.fillWidth: true
+                    text: "Load tasks…"
+                    onClicked: loadTasksDialog.open()
+                }
+            }
+            Label {
+                Layout.fillWidth: true
+                text: "Loading tasks keeps their field link; load the fields file first."
+                color: "#8995a3"
+                font.pixelSize: 11
+                wrapMode: Text.Wrap
+            }
         }
+    }
+
+    FileDialog {
+        id: saveFieldsDialog
+        title: "Save fields"
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "json"
+        nameFilters: ["Field files (*.json)", "All files (*)"]
+        onAccepted: bridge.saveFields(selectedFile)
+    }
+    FileDialog {
+        id: loadFieldsDialog
+        title: "Load fields"
+        nameFilters: ["Field files (*.json)", "All files (*)"]
+        onAccepted: bridge.loadFields(selectedFile)
+    }
+    FileDialog {
+        id: saveTasksDialog
+        title: "Save tasks"
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "json"
+        nameFilters: ["Task files (*.json)", "All files (*)"]
+        onAccepted: bridge.saveTasks(selectedFile)
+    }
+    FileDialog {
+        id: loadTasksDialog
+        title: "Load tasks"
+        nameFilters: ["Task files (*.json)", "All files (*)"]
+        onAccepted: bridge.loadTasks(selectedFile)
     }
 }
