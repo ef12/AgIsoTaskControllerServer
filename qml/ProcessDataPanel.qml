@@ -20,10 +20,22 @@ GroupBox {
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: tabs.currentIndex
-            ListView {
-                id: basicList
-                model: bridge.tcBasicData
-                clip: true
+            ColumnLayout {
+                Label {
+                    Layout.fillWidth: true
+                    visible: bridge.tcBasicData.length === 0
+                    text: "No implement data yet. Select the client (its pool loads automatically), then start a task — rows appear as values arrive."
+                    color: "#8995a3"
+                    font.pixelSize: 12
+                    wrapMode: Text.Wrap
+                }
+                ListView {
+                    id: basicList
+                    visible: bridge.tcBasicData.length > 0
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    model: bridge.tcBasicData
+                    clip: true
                 delegate: Rectangle {
                     width: basicList.width
                     height: 32
@@ -43,6 +55,7 @@ GroupBox {
                         }
                     }
                 }
+            }
             }
             ColumnLayout {
                 spacing: 7

@@ -2114,7 +2114,9 @@ namespace agisotc
 		lastCoverageX = currentImplementX;
 		lastCoverageZ = currentImplementZ;
 		coveragePositionValid = true;
-		if (!taskActive || (activeSectionCount() == 0) || (distance > 10.0)) return;
+		// Accrue when our task is active, or whenever the client itself reports
+		// sections ON (covers implements worked without an app-side task).
+		if ((!taskActive && (activeSectionCount() == 0)) || (distance > 10.0)) return;
 		double activeWidth = 0.0;
 		for (const auto &element : implementElementStates)
 		{
