@@ -14,6 +14,7 @@ GroupBox {
             TabButton { text: "TC-SC" }
             TabButton { text: "Raw process data" }
             TabButton { text: "DDI traffic" }
+            TabButton { text: "Bus monitor" }
         }
         StackLayout {
             Layout.fillWidth: true
@@ -163,6 +164,54 @@ GroupBox {
                             Text { width: 70; text: trafficElement; color: "#dfe6ee"; font.pixelSize: 12 }
                             Text { width: 88; text: trafficValue; color: "#8fe388"; font.pixelSize: 12 }
                             Text { text: trafficDetail; color: "#8995a3"; font.pixelSize: 12; elide: Text.ElideRight }
+                        }
+                    }
+                }
+            }
+            ColumnLayout {
+                spacing: 4
+                Label {
+                    text: "Every address-claim, transport, process-data, speed and GPS frame on the bus, whoever sent it."
+                    color: "#8995a3"
+                    font.pixelSize: 11
+                    wrapMode: Text.Wrap
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Item { Layout.fillWidth: true }
+                    Button {
+                        text: "Clear"
+                        onClicked: bridge.clearBusMonitor()
+                    }
+                }
+                Row {
+                    Layout.fillWidth: true
+                    height: 22
+                    Text { width: 80; text: "Time"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                    Text { width: 110; text: "PGN"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                    Text { width: 54; text: "Src"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                    Text { width: 54; text: "Dst"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                    Text { width: 54; text: "Len"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                    Text { text: "Data"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
+                }
+                Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: "#3a4048" }
+                ListView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    model: busMonitorModel
+                    clip: true
+                    delegate: Rectangle {
+                        width: ListView.view ? ListView.view.width : 600
+                        height: 22
+                        color: index % 2 ? "#151a20" : "transparent"
+                        Row {
+                            anchors.fill: parent
+                            Text { width: 80; text: frameTime; color: "#9fb0c3"; font.pixelSize: 12 }
+                            Text { width: 110; text: framePgn; color: "#73c7ff"; font.pixelSize: 12; elide: Text.ElideRight }
+                            Text { width: 54; text: frameSrc; color: "#dfe6ee"; font.pixelSize: 12 }
+                            Text { width: 54; text: frameDst; color: "#dfe6ee"; font.pixelSize: 12 }
+                            Text { width: 54; text: frameLen; color: "#dfe6ee"; font.pixelSize: 12 }
+                            Text { text: frameData; color: "#8fe388"; font.pixelSize: 12; elide: Text.ElideRight }
                         }
                     }
                 }

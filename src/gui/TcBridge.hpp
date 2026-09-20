@@ -8,7 +8,10 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
+#include <deque>
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -87,6 +90,7 @@ namespace agisotc
 		Q_PROPERTY(DdopModel *ddopModel READ ddopModel CONSTANT)
 		Q_PROPERTY(ProcessDataModel *valueModel READ valueModel CONSTANT)
 		Q_PROPERTY(DdiTrafficModel *ddiTrafficModel READ ddiTrafficModel CONSTANT)
+	Q_PROPERTY(BusMonitorModel *busMonitorModel READ busMonitorModel CONSTANT)
 		Q_PROPERTY(LogModel *logModel READ logModel CONSTANT)
 
 	public:
@@ -154,6 +158,7 @@ namespace agisotc
 		DdopModel *ddopModel();
 		ProcessDataModel *valueModel();
 		DdiTrafficModel *ddiTrafficModel();
+	BusMonitorModel *busMonitorModel();
 		LogModel *logModel();
 
 		Q_INVOKABLE bool startServer(const QString &driver, const QString &channel, int tcNumber, int booms, int sections, int channels);
@@ -184,8 +189,9 @@ namespace agisotc
 		Q_INVOKABLE void clearTrack();
 		Q_INVOKABLE void setAutoDdiSync(bool enabled);
 		Q_INVOKABLE void setDdiSyncIntervalMs(int intervalMs);
-		Q_INVOKABLE void setLiveDdiTrafficWatch(bool enabled);
-		Q_INVOKABLE void clearDdiTraffic();
+	Q_INVOKABLE void setLiveDdiTrafficWatch(bool enabled);
+	Q_INVOKABLE void clearDdiTraffic();
+	Q_INVOKABLE void clearBusMonitor();
 		Q_INVOKABLE void requestImplementDdis();
 		Q_INVOKABLE bool startBoundaryRecording(const QString &name);
 		Q_INVOKABLE bool finishBoundaryRecording();
@@ -242,6 +248,10 @@ namespace agisotc
 		void updateNmea2000Gps();
 		void rebuildFieldBoundaryPoints();
 		static void processGpsCanMessage(const isobus::CANMessage &message, void *parentPointer);
+		void registerBusMonitor();
+		void unregisterBusMonitor();
+		void drainBusFrames();
+		static void processBusMessage(const isobus::CANMessage &message, void *parentPointer);
 
 		CanBusManager canBus;
 		GpsProvider gpsProvider;
@@ -256,7 +266,20 @@ namespace agisotc
 		DdopModel ddop;
 		ProcessDataModel values;
 		DdiTrafficModel ddiTraffic;
+		BusMonitorModel busMonitor;
 		LogModel logs;
+
+		struct BusFrameEvent
+		{
+			std::uint32_t pgn = 0;
+			int source = -1;
+			int destination = -1;
+			std::uint32_t length = 0;
+			QString dataHex;
+			std::uint64_t timestampMs = 0;
+		};
+		std::mutex busMutex;
+		std::deque<BusFrameEvent> pendingBusFrames;
 
 		bool running = false;
 		bool taskActive = false;

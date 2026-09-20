@@ -265,6 +265,74 @@ namespace agisotc
 		endResetModel();
 	}
 
+	BusMonitorModel::BusMonitorModel(QObject *parent) :
+	  QAbstractListModel(parent)
+	{
+	}
+
+	int BusMonitorModel::rowCount(const QModelIndex &parent) const
+	{
+		return parent.isValid() ? 0 : rows.size();
+	}
+
+	QVariant BusMonitorModel::data(const QModelIndex &index, int role) const
+	{
+		if (!index.isValid() || index.row() < 0 || index.row() >= rows.size())
+		{
+			return {};
+		}
+		const auto &row = rows.at(index.row());
+		switch (role)
+		{
+			case TimestampRole:
+				return row.timestamp;
+			case PgnRole:
+				return row.pgn;
+			case SourceRole:
+				return row.source;
+			case DestinationRole:
+				return row.destination;
+			case LengthRole:
+				return row.length;
+			case DataRole:
+				return row.data;
+			default:
+				return {};
+		}
+	}
+
+	QHash<int, QByteArray> BusMonitorModel::roleNames() const
+	{
+		return {
+			{ TimestampRole, "frameTime" },
+			{ PgnRole, "framePgn" },
+			{ SourceRole, "frameSrc" },
+			{ DestinationRole, "frameDst" },
+			{ LengthRole, "frameLen" },
+			{ DataRole, "frameData" },
+		};
+	}
+
+	void BusMonitorModel::addRow(const BusFrameRow &row)
+	{
+		if (rows.size() >= MAX_ROWS)
+		{
+			beginRemoveRows(QModelIndex(), 0, 0);
+			rows.removeFirst();
+			endRemoveRows();
+		}
+		beginInsertRows(QModelIndex(), rows.size(), rows.size());
+		rows.push_back(row);
+		endInsertRows();
+	}
+
+	void BusMonitorModel::clear()
+	{
+		beginResetModel();
+		rows.clear();
+		endResetModel();
+	}
+
 	LogModel::LogModel(QObject *parent) :
 	  QAbstractListModel(parent)
 	{

@@ -10,6 +10,7 @@
 #include <QFile>
 #include <QVariantMap>
 
+#include "isobus/isobus/can_general_parameter_group_numbers.hpp"
 #include "isobus/isobus/can_message.hpp"
 #include "isobus/isobus/can_network_manager.hpp"
 #include "isobus/isobus/isobus_device_descriptor_object_pool.hpp"
@@ -352,6 +353,124 @@ namespace agisotc
 		return &ddiTraffic;
 	}
 
+	BusMonitorModel *TcBridge::busMonitorModel()
+	{
+		return &busMonitor;
+	}
+
+	void TcBridge::clearBusMonitor()
+	{
+		busMonitor.clear();
+	}
+
+	void TcBridge::registerBusMonitor()
+	{
+		using PGN = isobus::CANLibParameterGroupNumber;
+		static constexpr std::uint32_t NMEA_129025 = 129025;
+		static constexpr std::uint32_t NMEA_129026 = 129026;
+		static constexpr std::uint32_t NMEA_129029 = 129029;
+		const std::uint32_t watched[] = {
+			static_cast<std::uint32_t>(PGN::AddressClaim),
+			static_cast<std::uint32_t>(PGN::ProcessData),
+			static_cast<std::uint32_t>(PGN::ParameterGroupNumberRequest),
+			static_cast<std::uint32_t>(PGN::TransportProtocolConnectionManagement),
+			static_cast<std::uint32_t>(PGN::TransportProtocolDataTransfer),
+			static_cast<std::uint32_t>(PGN::ExtendedTransportProtocolConnectionManagement),
+			static_cast<std::uint32_t>(PGN::ExtendedTransportProtocolDataTransfer),
+			static_cast<std::uint32_t>(PGN::MachineSelectedSpeed),
+			static_cast<std::uint32_t>(PGN::WheelBasedSpeedAndDistance),
+			static_cast<std::uint32_t>(PGN::GroundBasedSpeedAndDistance),
+			NMEA_129025,
+			NMEA_129026,
+			NMEA_129029,
+		};
+		for (const auto pgn : watched)
+		{
+			isobus::CANNetworkManager::CANNetwork.add_global_parameter_group_number_callback(
+			  pgn, &TcBridge::processBusMessage, this);
+		}
+	}
+
+	void TcBridge::unregisterBusMonitor()
+	{
+		using PGN = isobus::CANLibParameterGroupNumber;
+		static constexpr std::uint32_t watched[] = {
+			static_cast<std::uint32_t>(PGN::AddressClaim),
+			static_cast<std::uint32_t>(PGN::ProcessData),
+			static_cast<std::uint32_t>(PGN::ParameterGroupNumberRequest),
+			static_cast<std::uint32_t>(PGN::TransportProtocolConnectionManagement),
+			static_cast<std::uint32_t>(PGN::TransportProtocolDataTransfer),
+			static_cast<std::uint32_t>(PGN::ExtendedTransportProtocolConnectionManagement),
+			static_cast<std::uint32_t>(PGN::ExtendedTransportProtocolDataTransfer),
+			static_cast<std::uint32_t>(PGN::MachineSelectedSpeed),
+			static_cast<std::uint32_t>(PGN::WheelBasedSpeedAndDistance),
+			static_cast<std::uint32_t>(PGN::GroundBasedSpeedAndDistance),
+			129025,
+			129026,
+			129029,
+		};
+		for (const auto pgn : watched)
+		{
+			isobus::CANNetworkManager::CANNetwork.remove_global_parameter_group_number_callback(
+			  pgn, &TcBridge::processBusMessage, this);
+		}
+	}
+
+	void TcBridge::processBusMessage(const isobus::CANMessage &message, void *parentPointer)
+	{
+		auto *bridge = static_cast<TcBridge *>(parentPointer);
+		if (nullptr == bridge)
+		{
+			return;
+		}
+		BusFrameEvent event;
+		event.pgn = message.get_identifier().get_parameter_group_number();
+		auto source = message.get_source_control_function();
+		auto destination = message.get_destination_control_function();
+		event.source = (nullptr != source) ? static_cast<int>(source->get_address()) : -1;
+		event.destination = (nullptr != destination) ? static_cast<int>(destination->get_address()) : 255;
+		const auto &data = message.get_data();
+		event.length = static_cast<std::uint32_t>(data.size());
+		QString hex;
+		hex.reserve(24);
+		for (std::size_t i = 0; (i < data.size()) && (i < 8); ++i)
+		{
+			if (0 != i)
+			{
+				hex += ' ';
+			}
+			hex += QString("%1").arg(data[i], 2, 16, QChar('0')).toUpper();
+		}
+		event.dataHex = hex;
+		event.timestampMs = steady_clock_ms();
+		std::lock_guard<std::mutex> lock(bridge->busMutex);
+		bridge->pendingBusFrames.push_back(std::move(event));
+		if (bridge->pendingBusFrames.size() > 600)
+		{
+			bridge->pendingBusFrames.pop_front();
+		}
+	}
+
+	void TcBridge::drainBusFrames()
+	{
+		std::deque<BusFrameEvent> frames;
+		{
+			std::lock_guard<std::mutex> lock(busMutex);
+			frames.swap(pendingBusFrames);
+		}
+		for (const auto &frame : frames)
+		{
+			BusFrameRow row;
+			row.timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
+			row.pgn = QString("0x%1 (%2)").arg(frame.pgn, 5, 16, QChar('0')).arg(frame.pgn).toUpper();
+			row.source = frame.source;
+			row.destination = frame.destination;
+			row.length = static_cast<int>(frame.length);
+			row.data = frame.dataHex;
+			busMonitor.addRow(row);
+		}
+	}
+
 	LogModel *TcBridge::logModel()
 	{
 		return &logs;
@@ -383,6 +502,12 @@ namespace agisotc
 			return false;
 		}
 		registerGpsCanCallbacks();
+		registerBusMonitor();
+		if ("virtual" == settings.driver)
+		{
+			logs.addLine("[bus] WARNING: the 'virtual' driver is process-local. External simulators "
+			             "on this machine cannot join it - use 'wcan' with the same bus name instead.");
+		}
 
 		// Broadcast our GPS/simulated motion as machine speed so implements
 		// and terminals on the bus pick up speed and distance. We sense the
@@ -455,6 +580,7 @@ namespace agisotc
 		}
 		speedMessages.reset();
 		nmea2000.reset();
+		unregisterBusMonitor();
 		unregisterGpsCanCallbacks();
 		canBus.stop();
 		for (auto &state : implementDdiStates) state.reportingConfigured = false;
@@ -479,6 +605,7 @@ namespace agisotc
 
 	void TcBridge::poll()
 	{
+		drainBusFrames();
 		updateGps();
 		if (!gpsRunningFlag)
 		{
