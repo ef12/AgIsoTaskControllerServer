@@ -40,6 +40,7 @@ namespace agisotc
 				case 0xC800: return "ETP.CM";
 				case 0xC700: return "ETP.DT";
 				case 0xCB00: return "ProcData";
+			case 0xFE0D: return "WorkSetMaster";
 				case 0xF022: return "MSSpeed";
 				case 0xFD43: return "MSSpdCmd";
 				case 0xFE48: return "WhlSpd";
@@ -445,10 +446,66 @@ namespace agisotc
 				         .arg(claimed.get_function_code())
 				         .arg(claimed.get_function_instance())
 				         .arg(claimed.get_manufacturer_code());
+				if (!frame.outgoing && (source >= 0) && (source <= 253))
+				{
+					BusPeerInfo info;
+					info.functionCode = claimed.get_function_code();
+					info.functionInstance = claimed.get_function_instance();
+					info.manufacturerCode = claimed.get_manufacturer_code();
+					info.lastSeenMs = steady_clock_ms();
+					busPeersByAddress[static_cast<std::uint8_t>(source)] = info;
+					refreshBusPeers();
+				}
+			}
+			if (!frame.outgoing && (0xCB00 == pgn) && (source >= 0) &&
+			    (connectedAddresses.find(static_cast<std::uint8_t>(source)) == connectedAddresses.end()))
+			{
+				hex += " [sender has no active DDOP with us - process data will be NACKed]";
 			}
 			row.data = hex;
 			busMonitor.addRow(row);
 		}
+		// Drop peers silent for over a minute.
+		const std::uint64_t nowMs = steady_clock_ms();
+		bool peersChanged = false;
+		for (auto it = busPeersByAddress.begin(); it != busPeersByAddress.end();)
+		{
+			if ((nowMs - it->second.lastSeenMs) > 60000)
+			{
+				it = busPeersByAddress.erase(it);
+				peersChanged = true;
+			}
+			else
+			{
+				++it;
+			}
+		}
+		if (peersChanged)
+		{
+			refreshBusPeers();
+		}
+	}
+
+	void TcBridge::refreshBusPeers()
+	{
+		QVariantList peers;
+		for (const auto &entry : busPeersByAddress)
+		{
+			QVariantMap row;
+			row["address"] = static_cast<int>(entry.first);
+			row["functionCode"] = entry.second.functionCode;
+			row["functionInstance"] = entry.second.functionInstance;
+			row["manufacturerCode"] = entry.second.manufacturerCode;
+			row["connected"] = (connectedAddresses.find(entry.first) != connectedAddresses.end());
+			peers.push_back(row);
+		}
+		currentBusPeers = peers;
+		emit busPeersChanged();
+	}
+
+	QVariantList TcBridge::busPeers() const
+	{
+		return currentBusPeers;
 	}
 
 	LogModel *TcBridge::logModel()
@@ -662,8 +719,13 @@ namespace agisotc
 	void TcBridge::refreshClients()
 	{
 		QList<ClientRow> rows;
+		connectedAddresses.clear();
 		for (const auto &snapshot : server->clients_snapshot())
 		{
+			if (snapshot.ddopActive && !snapshot.timedOut && (snapshot.address <= 253))
+			{
+				connectedAddresses.insert(static_cast<std::uint8_t>(snapshot.address));
+			}
 			ClientRow row;
 			row.address = snapshot.address;
 			row.nameHex = QString("0x%1").arg(snapshot.nameRaw, 16, 16, QChar('0')).toUpper();
@@ -704,6 +766,7 @@ namespace agisotc
 			emit selectedClientChanged();
 			refreshDdop();
 		}
+		refreshBusPeers();
 	}
 
 	void TcBridge::refreshDdop()

@@ -9,7 +9,9 @@
 
 #include <atomic>
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <set>
 #include <thread>
 #include <vector>
 
@@ -89,6 +91,7 @@ namespace agisotc
 		Q_PROPERTY(ProcessDataModel *valueModel READ valueModel CONSTANT)
 		Q_PROPERTY(DdiTrafficModel *ddiTrafficModel READ ddiTrafficModel CONSTANT)
 	Q_PROPERTY(BusMonitorModel *busMonitorModel READ busMonitorModel CONSTANT)
+	Q_PROPERTY(QVariantList busPeers READ busPeers NOTIFY busPeersChanged)
 		Q_PROPERTY(LogModel *logModel READ logModel CONSTANT)
 
 	public:
@@ -157,6 +160,7 @@ namespace agisotc
 		ProcessDataModel *valueModel();
 		DdiTrafficModel *ddiTrafficModel();
 	BusMonitorModel *busMonitorModel();
+	QVariantList busPeers() const;
 		LogModel *logModel();
 
 		Q_INVOKABLE bool startServer(const QString &driver, const QString &channel, int tcNumber, int booms, int sections, int channels);
@@ -222,6 +226,7 @@ namespace agisotc
 		void autoDdiSyncChanged();
 		void liveDdiTrafficWatchChanged();
 		void boundaryChanged();
+		void busPeersChanged();
 		void workChanged();
 		void drivingControlsChanged();
 		void identifyBanner(int tcNumber);
@@ -249,6 +254,7 @@ namespace agisotc
 		void updateSpeedMessages(double elapsedSeconds);
 		void updateNmea2000Gps();
 		void rebuildFieldBoundaryPoints();
+		void refreshBusPeers();
 		static void processGpsCanMessage(const isobus::CANMessage &message, void *parentPointer);
 		void drainBusFrames();
 
@@ -267,6 +273,17 @@ namespace agisotc
 		DdiTrafficModel ddiTraffic;
 		BusMonitorModel busMonitor;
 		LogModel logs;
+
+		struct BusPeerInfo
+		{
+			int functionCode = 0;
+			int functionInstance = 0;
+			int manufacturerCode = 0;
+			std::uint64_t lastSeenMs = 0;
+		};
+		std::map<std::uint8_t, BusPeerInfo> busPeersByAddress;
+		QVariantList currentBusPeers;
+		std::set<std::uint8_t> connectedAddresses;
 
 		bool running = false;
 		bool taskActive = false;

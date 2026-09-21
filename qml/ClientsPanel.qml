@@ -43,6 +43,27 @@ GroupBox {
                 }
             }
         }
+        Label {
+            text: "Heard on bus (address claims, connected or not)"
+            color: "#8995a3"
+            font.pixelSize: 11
+            font.bold: true
+        }
+        ListView {
+            id: peerList
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.min(110, count * 24 + 4)
+            model: bridge.busPeers
+            clip: true
+            delegate: Text {
+                width: peerList.width
+                text: "Addr " + modelData.address + "   func " + modelData.functionCode + "/" + modelData.functionInstance
+                      + "   mfr " + modelData.manufacturerCode + (modelData.connected ? "   CONNECTED" : "   not connected")
+                color: modelData.connected ? "#8fe388" : "#f2d33c"
+                font.pixelSize: 12
+                elide: Text.ElideRight
+            }
+        }
         RowLayout {
             spacing: 6
             Button {
