@@ -464,6 +464,19 @@ namespace agisotc
 			}
 			row.data = hex;
 			busMonitor.addRow(row);
+			if ((0xCB00 == pgn) && (8 == frame.length) && (frame.identifier > 0x7FF))
+			{
+				const auto ourControl = canBus.internal_control_function();
+				const int ourAddress = (nullptr != ourControl) ? static_cast<int>(ourControl->get_address()) : -1;
+				if ((source == ourAddress) || (destination == ourAddress))
+				{
+					const std::uint8_t command = frame.data[0] & 0x0F;
+					const std::uint16_t element = static_cast<std::uint16_t>((frame.data[0] >> 4) | (frame.data[1] << 4));
+					const std::uint16_t ddi = static_cast<std::uint16_t>(frame.data[2] | (frame.data[3] << 8));
+					const std::int32_t value = static_cast<std::int32_t>(frame.data[4] | (frame.data[5] << 8) | (frame.data[6] << 16) | (frame.data[7] << 24));
+					ingestSniffedProcessData(source, destination, frame.outgoing, command, ddi, element, value);
+				}
+			}
 		}
 		// Drop peers silent for over a minute.
 		const std::uint64_t nowMs = steady_clock_ms();
@@ -506,6 +519,74 @@ namespace agisotc
 	QVariantList TcBridge::busPeers() const
 	{
 		return currentBusPeers;
+	}
+
+	void TcBridge::ingestSniffedProcessData(int source, int destination, bool outgoing,
+	                                        std::uint8_t command, std::uint16_t ddi,
+	                                        std::uint16_t element, std::int32_t value)
+	{
+		// Single decode path for process data seen on the bus: feeds the DDI
+		// traffic view, the Raw tab, the implement model, and section states,
+		// whether or not the sender completed the TC connection procedure.
+		const QString direction = outgoing ? "TC -> client" : "client -> TC";
+		const int peerAddress = outgoing ? destination : source;
+
+		QString commandName;
+		bool valueBearing = false;
+		switch (command)
+		{
+			case 0x02: commandName = "Request"; break;
+			case 0x03: commandName = "Value"; valueBearing = true; break;
+			case 0x04: commandName = "MeasTime"; break;
+			case 0x05: commandName = "MeasDist"; break;
+			case 0x06: commandName = "MeasMin"; break;
+			case 0x07: commandName = "MeasMax"; break;
+			case 0x08: commandName = "MeasChg"; break;
+			case 0x0A: commandName = "Set+Ack"; valueBearing = true; break;
+			case 0x0D: commandName = "Ack"; break;
+			case 0x0E: commandName = "Status"; break;
+			case 0x0F: commandName = "ClientTask"; break;
+			case 0x09: commandName = "PeerCtl"; break;
+			default: commandName = QString("Cmd%1").arg(command); break;
+		}
+		if ((0x00 == command) || (0x01 == command))
+		{
+			return; // Technical / device-descriptor transfers are bus-tab material only.
+		}
+
+		QString detail = "sniffed";
+		for (const auto &state : implementDdiStates)
+		{
+			if ((state.ddi == ddi) && (state.element == element))
+			{
+				detail = state.name;
+				break;
+			}
+		}
+		if (liveDdiTrafficWatchEnabled)
+		{
+			appendDdiTraffic(direction, commandName, peerAddress, ddi, element, value, detail);
+		}
+		if (!valueBearing)
+		{
+			return;
+		}
+		values.upsertValue(peerAddress, ddi, element, value, timestamp_now());
+		if (peerAddress != currentSelectedClient)
+		{
+			return;
+		}
+		updateImplementValue(ddi, element, value);
+		if ((0 != currentSectionDdi) && (ddi == currentSectionDdi) &&
+		    (element >= 1) && (element <= currentSectionCount))
+		{
+			const bool on = (0 != value);
+			if (currentSectionStates.at(element - 1).toBool() != on)
+			{
+				currentSectionStates[element - 1] = QVariant(on);
+				emit sectionStatesChanged();
+			}
+		}
 	}
 
 	LogModel *TcBridge::logModel()
@@ -655,39 +736,9 @@ namespace agisotc
 		{
 			logs.addLine(QString("[%1] %2").arg(timestamp_now(), QString::fromStdString(line)));
 		}
-		for (const auto &value : events.values)
-		{
-			values.upsertValue(value.address, value.ddi, value.element, value.value, timestamp_now());
-			if (static_cast<int>(value.address) == currentSelectedClient)
-			{
-				updateImplementValue(value.ddi, value.element, value.value);
-			}
-			if ((0 != currentSectionDdi) && (value.ddi == currentSectionDdi) &&
-			    (value.element >= 1) && (value.element <= currentSectionCount))
-			{
-				const bool on = (0 != value.value);
-				if (currentSectionStates.at(value.element - 1).toBool() != on)
-				{
-					currentSectionStates[value.element - 1] = QVariant(on);
-					emit sectionStatesChanged();
-				}
-			}
-		}
-		if (liveDdiTrafficWatchEnabled)
-		{
-			for (const auto &event : events.ddiTraffic)
-			{
-				if (event.acknowledge)
-				{
-					appendDdiTraffic("client -> TC", "PDACK", event.address, event.ddi, event.element, event.errorCode,
-					                 QString("command %1").arg(event.command));
-				}
-				else if (event.hasValue)
-				{
-					appendDdiTraffic("client -> TC", "Value", event.address, event.ddi, event.element, event.value, "reported");
-				}
-			}
-		}
+		// Process-data values, section states, and DDI traffic rows all come
+		// from the sniffer decode now (ingestSniffedProcessData), which also
+		// covers senders the protocol stack drops.
 		if (events.rosterChanged)
 		{
 			refreshClients();
@@ -1211,7 +1262,6 @@ namespace agisotc
 			if (server->send_request_value(client, state.ddi, state.element))
 			{
 				++sentCount;
-				appendDdiTraffic("TC -> client", "Request", currentSelectedClient, state.ddi, state.element, 0, state.name);
 			}
 		}
 		logs.addLine(QString("[ddop] Requested %1/%2 declared process values from %3.")
@@ -1236,16 +1286,8 @@ namespace agisotc
 			{
 				state.reportingConfigured = server->send_time_interval_measurement_command(
 				  client, state.ddi, state.element, static_cast<std::uint32_t>(currentDdiSyncIntervalMs));
-				if (state.reportingConfigured)
-				{
-					appendDdiTraffic("TC -> client", "Time interval", currentSelectedClient, state.ddi, state.element,
-					                 currentDdiSyncIntervalMs, state.name);
-				}
 			}
-			if (server->send_request_value(client, state.ddi, state.element))
-			{
-				appendDdiTraffic("TC -> client", "Request", currentSelectedClient, state.ddi, state.element, 0, state.name);
-			}
+			server->send_request_value(client, state.ddi, state.element);
 			++nextDdiSyncIndex;
 		}
 		lastDdiSyncMs = now;
@@ -1297,7 +1339,6 @@ namespace agisotc
 		}
 		const bool sent = server->send_request_value(client, static_cast<std::uint16_t>(ddi), static_cast<std::uint16_t>(element));
 		logs.addLine(QString("[cmd] Request value DDI %1 element %2 -> %3.").arg(ddi).arg(element).arg(sent ? "sent" : "FAILED"));
-		if (sent) appendDdiTraffic("TC -> client", "Request", currentSelectedClient, ddi, element, 0, "manual");
 	}
 
 	void TcBridge::setValue(int ddi, int element, int value, bool acknowledge)
@@ -1316,7 +1357,6 @@ namespace agisotc
 		const bool sent = acknowledge ? server->send_set_value_and_acknowledge(client, static_cast<std::uint16_t>(ddi), static_cast<std::uint16_t>(element), static_cast<std::uint32_t>(value))
 		                              : server->send_set_value(client, static_cast<std::uint16_t>(ddi), static_cast<std::uint16_t>(element), static_cast<std::uint32_t>(value));
 		logs.addLine(QString("[cmd] Set value DDI %1 element %2 = %3%4 -> %5.").arg(ddi).arg(element).arg(value).arg(acknowledge ? " (ack)" : "").arg(sent ? "sent" : "FAILED"));
-		if (sent) appendDdiTraffic("TC -> client", acknowledge ? "Set+Ack" : "Set", currentSelectedClient, ddi, element, value, "manual");
 	}
 
 	void TcBridge::sendMeasurement(int kind, int ddi, int element, int value)
@@ -1359,7 +1399,6 @@ namespace agisotc
 				return;
 		}
 		logs.addLine(QString("[cmd] Measurement command %1 DDI %2 element %3 = %4 -> %5.").arg(kind).arg(ddi).arg(element).arg(value).arg(sent ? "sent" : "FAILED"));
-		if (sent) appendDdiTraffic("TC -> client", QString("Measurement %1").arg(kind), currentSelectedClient, ddi, element, value, "manual");
 	}
 
 	void TcBridge::setSectionDdi(int ddi)

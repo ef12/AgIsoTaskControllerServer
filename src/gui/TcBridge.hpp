@@ -255,6 +255,9 @@ namespace agisotc
 		void updateNmea2000Gps();
 		void rebuildFieldBoundaryPoints();
 		void refreshBusPeers();
+		void ingestSniffedProcessData(int source, int destination, bool outgoing,
+		                              std::uint8_t command, std::uint16_t ddi,
+		                              std::uint16_t element, std::int32_t value);
 		static void processGpsCanMessage(const isobus::CANMessage &message, void *parentPointer);
 		void drainBusFrames();
 
