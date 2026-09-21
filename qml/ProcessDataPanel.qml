@@ -184,7 +184,7 @@ GroupBox {
             ColumnLayout {
                 spacing: 4
                 Label {
-                    text: "Every address-claim, transport, process-data, speed and GPS frame on the bus, whoever sent it."
+                    text: "Every CAN frame on the bus, both directions — anything any device puts there."
                     color: "#8995a3"
                     font.pixelSize: 11
                     wrapMode: Text.Wrap

@@ -6,11 +6,14 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <string>
 
 #include "isobus/hardware_integration/can_hardware_plugin.hpp"
 #include "isobus/isobus/can_internal_control_function.hpp"
+
+#include "CanSniffer.hpp"
 
 namespace agisotc
 {
@@ -41,8 +44,12 @@ namespace agisotc
 		std::shared_ptr<isobus::InternalControlFunction> internal_control_function() const;
 		std::string active_driver_name() const;
 
+		/// @brief Takes (and clears) all raw CAN frames seen since the last call.
+		std::deque<SniffedFrame> take_sniffed_frames();
+
 	private:
 		std::shared_ptr<isobus::CANHardwarePlugin> driver;
+		std::shared_ptr<SniffingCANPlugin> sniffer;
 		std::shared_ptr<isobus::InternalControlFunction> internalControlFunction;
 		std::string driverName;
 		bool running = false;

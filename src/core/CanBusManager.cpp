@@ -77,6 +77,10 @@ namespace agisotc
 			return false;
 		}
 
+		// Wrap the driver so the bus monitor sees every frame, both directions.
+		sniffer = std::make_shared<SniffingCANPlugin>(driver);
+		driver = sniffer;
+
 		isobus::CANHardwareInterface::set_number_of_can_channels(1);
 		isobus::CANHardwareInterface::assign_can_channel_frame_handler(0, driver);
 
@@ -85,6 +89,7 @@ namespace agisotc
 			error = "Failed to start the CAN hardware interface. The driver may be invalid or the device missing.";
 			isobus::CANHardwareInterface::stop();
 			driver.reset();
+			sniffer.reset();
 			return false;
 		}
 
@@ -109,6 +114,7 @@ namespace agisotc
 			error = "Failed to create the internal control function.";
 			isobus::CANHardwareInterface::stop();
 			driver.reset();
+			sniffer.reset();
 			return false;
 		}
 
@@ -125,8 +131,18 @@ namespace agisotc
 			isobus::CANHardwareInterface::unassign_can_channel_frame_handler(0);
 			driver.reset();
 		}
+		sniffer.reset();
 		driverName.clear();
 		running = false;
+	}
+
+	std::deque<SniffedFrame> CanBusManager::take_sniffed_frames()
+	{
+		if (nullptr != sniffer)
+		{
+			return sniffer->take_frames();
+		}
+		return {};
 	}
 
 	bool CanBusManager::is_running() const

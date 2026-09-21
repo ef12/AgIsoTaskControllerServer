@@ -22,6 +22,7 @@ FetchContent_MakeAvailable(CAN_STACK)
 add_library(tcserver_core STATIC
   src/core/TcServerCore.cpp
   src/core/CanBusManager.cpp
+  src/core/CanSniffer.cpp
   src/core/GpsProvider.cpp
   src/core/FieldTaskManager.cpp
   src/core/NmeaParser.cpp

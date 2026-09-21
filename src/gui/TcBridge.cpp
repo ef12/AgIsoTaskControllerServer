@@ -13,7 +13,6 @@
 #include <QJsonObject>
 #include <QVariantMap>
 
-#include "isobus/isobus/can_general_parameter_group_numbers.hpp"
 #include "isobus/isobus/can_message.hpp"
 #include "isobus/isobus/can_NAME.hpp"
 #include "isobus/isobus/can_network_manager.hpp"
@@ -29,6 +28,31 @@ namespace agisotc
 	{
 		constexpr double EarthRadiusM = 6371000.0;
 		constexpr double DegreesToRadians = 3.14159265358979323846 / 180.0;
+
+		QString pgnName(std::uint32_t pgn)
+		{
+			switch (pgn)
+			{
+				case 0xEE00: return "AddrClaim";
+				case 0xEA00: return "Request";
+				case 0xEC00: return "TP.CM";
+				case 0xEB00: return "TP.DT";
+				case 0xC800: return "ETP.CM";
+				case 0xC700: return "ETP.DT";
+				case 0xCB00: return "ProcData";
+				case 0xF022: return "MSSpeed";
+				case 0xFD43: return "MSSpdCmd";
+				case 0xFE48: return "WhlSpd";
+				case 0xFE49: return "GndSpd";
+				case 129025: return "GPS.Pos";
+				case 129026: return "GPS.COG/SOG";
+				case 129027: return "GPS.dPos";
+				case 129029: return "GPS.GNSS";
+				case 127250: return "VesselHdg";
+				case 127251: return "ROT";
+				default: return {};
+			}
+		}
 
 		isobus::NMEA2000Messages::GNSSPositionData::GNSSMethod mapFixQualityToGnssMethod(const std::optional<FixQuality> &quality)
 		{
@@ -367,152 +391,62 @@ namespace agisotc
 		busMonitor.clear();
 	}
 
-	void TcBridge::registerBusMonitor()
-	{
-		using PGN = isobus::CANLibParameterGroupNumber;
-		static constexpr std::uint32_t NMEA_129025 = 129025;
-		static constexpr std::uint32_t NMEA_129026 = 129026;
-		static constexpr std::uint32_t NMEA_129029 = 129029;
-		const std::uint32_t watched[] = {
-			static_cast<std::uint32_t>(PGN::AddressClaim),
-			static_cast<std::uint32_t>(PGN::ProcessData),
-			static_cast<std::uint32_t>(PGN::ParameterGroupNumberRequest),
-			static_cast<std::uint32_t>(PGN::TransportProtocolConnectionManagement),
-			static_cast<std::uint32_t>(PGN::TransportProtocolDataTransfer),
-			static_cast<std::uint32_t>(PGN::ExtendedTransportProtocolConnectionManagement),
-			static_cast<std::uint32_t>(PGN::ExtendedTransportProtocolDataTransfer),
-			static_cast<std::uint32_t>(PGN::MachineSelectedSpeed),
-			static_cast<std::uint32_t>(PGN::WheelBasedSpeedAndDistance),
-			static_cast<std::uint32_t>(PGN::GroundBasedSpeedAndDistance),
-			NMEA_129025,
-			NMEA_129026,
-			NMEA_129029,
-		};
-		for (const auto pgn : watched)
-		{
-			isobus::CANNetworkManager::CANNetwork.add_global_parameter_group_number_callback(
-			  pgn, &TcBridge::processBusMessage, this);
-		}
-	}
-
-	void TcBridge::unregisterBusMonitor()
-	{
-		using PGN = isobus::CANLibParameterGroupNumber;
-		static constexpr std::uint32_t watched[] = {
-			static_cast<std::uint32_t>(PGN::AddressClaim),
-			static_cast<std::uint32_t>(PGN::ProcessData),
-			static_cast<std::uint32_t>(PGN::ParameterGroupNumberRequest),
-			static_cast<std::uint32_t>(PGN::TransportProtocolConnectionManagement),
-			static_cast<std::uint32_t>(PGN::TransportProtocolDataTransfer),
-			static_cast<std::uint32_t>(PGN::ExtendedTransportProtocolConnectionManagement),
-			static_cast<std::uint32_t>(PGN::ExtendedTransportProtocolDataTransfer),
-			static_cast<std::uint32_t>(PGN::MachineSelectedSpeed),
-			static_cast<std::uint32_t>(PGN::WheelBasedSpeedAndDistance),
-			static_cast<std::uint32_t>(PGN::GroundBasedSpeedAndDistance),
-			129025,
-			129026,
-			129029,
-		};
-		for (const auto pgn : watched)
-		{
-			isobus::CANNetworkManager::CANNetwork.remove_global_parameter_group_number_callback(
-			  pgn, &TcBridge::processBusMessage, this);
-		}
-	}
-
-	void TcBridge::processBusMessage(const isobus::CANMessage &message, void *parentPointer)
-	{
-		auto *bridge = static_cast<TcBridge *>(parentPointer);
-		if (nullptr == bridge)
-		{
-			return;
-		}
-		BusFrameEvent event;
-		event.pgn = message.get_identifier().get_parameter_group_number();
-		auto source = message.get_source_control_function();
-		auto destination = message.get_destination_control_function();
-		event.source = (nullptr != source) ? static_cast<int>(source->get_address()) : -1;
-		event.destination = (nullptr != destination) ? static_cast<int>(destination->get_address()) : 255;
-		event.outgoing = false;
-		const auto &data = message.get_data();
-		event.length = static_cast<std::uint32_t>(data.size());
-		QString hex;
-		hex.reserve(24);
-		for (std::size_t i = 0; (i < data.size()) && (i < 8); ++i)
-		{
-			if (0 != i)
-			{
-				hex += ' ';
-			}
-			hex += QString("%1").arg(data[i], 2, 16, QChar('0')).toUpper();
-		}
-		event.dataHex = hex;
-		if ((0xEE00 == event.pgn) && (data.size() >= 8))
-		{
-			// Decode the claimed NAME so the bus tab shows WHO claimed.
-			std::uint64_t rawName = 0;
-			for (std::size_t i = 0; i < 8; ++i)
-			{
-				rawName |= static_cast<std::uint64_t>(data[i]) << (8 * i);
-			}
-			const isobus::NAME claimed(rawName);
-			event.dataHex += QString(" [func=%1 inst=%2 mfr=%3]")
-			                   .arg(claimed.get_function_code())
-			                   .arg(claimed.get_function_instance())
-			                   .arg(claimed.get_manufacturer_code());
-		}
-		event.timestampMs = steady_clock_ms();
-		std::lock_guard<std::mutex> lock(bridge->busMutex);
-		bridge->pendingBusFrames.push_back(std::move(event));
-		if (bridge->pendingBusFrames.size() > 600)
-		{
-			bridge->pendingBusFrames.pop_front();
-		}
-	}
-
-	void TcBridge::logBusTx(std::uint32_t pgn, std::uint32_t length, const QString &detail)
-	{
-		const std::uint64_t nowMs = steady_clock_ms();
-		auto last = lastBusTxLogMs.find(pgn);
-		if ((last != lastBusTxLogMs.end()) && ((nowMs - last->second) < 1000))
-		{
-			return;
-		}
-		lastBusTxLogMs[pgn] = nowMs;
-		BusFrameEvent event;
-		event.pgn = pgn;
-		event.outgoing = true;
-		event.length = length;
-		event.dataHex = detail;
-		event.timestampMs = nowMs;
-		auto icf = canBus.internal_control_function();
-		event.source = (nullptr != icf) ? static_cast<int>(icf->get_address()) : -1;
-		event.destination = 255;
-		std::lock_guard<std::mutex> lock(busMutex);
-		pendingBusFrames.push_back(std::move(event));
-		if (pendingBusFrames.size() > 600)
-		{
-			pendingBusFrames.pop_front();
-		}
-	}
-
 	void TcBridge::drainBusFrames()
 	{
-		std::deque<BusFrameEvent> frames;
+		if (!canBus.is_running())
 		{
-			std::lock_guard<std::mutex> lock(busMutex);
-			frames.swap(pendingBusFrames);
+			return;
 		}
-		for (const auto &frame : frames)
+		for (const auto &frame : canBus.take_sniffed_frames())
 		{
 			BusFrameRow row;
 			row.timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
 			row.direction = frame.outgoing ? "TX" : "RX";
-			row.pgn = QString("0x%1 (%2)").arg(frame.pgn, 5, 16, QChar('0')).arg(frame.pgn).toUpper();
-			row.source = frame.source;
-			row.destination = frame.destination;
-			row.length = static_cast<int>(frame.length);
-			row.data = frame.dataHex;
+			std::uint32_t pgn = frame.identifier;
+			int source = -1;
+			int destination = 255;
+			if (frame.identifier > 0x7FF)
+			{
+				pgn = (frame.identifier >> 8) & 0x3FFFF;
+				source = static_cast<int>(frame.identifier & 0xFF);
+				const std::uint32_t format = (frame.identifier >> 16) & 0xFF;
+				if (format < 0xF0)
+				{
+					pgn = (frame.identifier >> 8) & 0x3FF00;
+					destination = static_cast<int>((frame.identifier >> 8) & 0xFF);
+				}
+			}
+			const QString name = pgnName(pgn);
+			row.pgn = name.isEmpty() ? QString("0x%1 (%2)").arg(pgn, 5, 16, QChar('0')).arg(pgn).toUpper()
+			                         : QString("0x%1 (%2) %3").arg(pgn, 5, 16, QChar('0')).arg(pgn).arg(name).toUpper();
+			row.source = source;
+			row.destination = destination;
+			row.length = frame.length;
+			QString hex;
+			hex.reserve(24);
+			for (std::uint8_t i = 0; (i < frame.length) && (i < 8); ++i)
+			{
+				if (0 != i)
+				{
+					hex += ' ';
+				}
+				hex += QString("%1").arg(frame.data[i], 2, 16, QChar('0')).toUpper();
+			}
+			if ((0xEE00 == pgn) && (frame.length >= 8))
+			{
+				// Decode the claimed NAME so the bus tab shows WHO claimed.
+				std::uint64_t rawName = 0;
+				for (std::uint8_t i = 0; i < 8; ++i)
+				{
+					rawName |= static_cast<std::uint64_t>(frame.data[i]) << (8 * i);
+				}
+				const isobus::NAME claimed(rawName);
+				hex += QString(" [func=%1 inst=%2 mfr=%3]")
+				         .arg(claimed.get_function_code())
+				         .arg(claimed.get_function_instance())
+				         .arg(claimed.get_manufacturer_code());
+			}
+			row.data = hex;
 			busMonitor.addRow(row);
 		}
 	}
@@ -548,20 +482,6 @@ namespace agisotc
 			return false;
 		}
 		registerGpsCanCallbacks();
-		registerBusMonitor();
-		addressClaimListener = canBus.internal_control_function()->get_address_claimed_event_dispatcher().add_listener(
-		  [this](std::uint8_t address) {
-			  BusFrameEvent event;
-			  event.pgn = 0xEE00;
-			  event.source = static_cast<int>(address);
-			  event.destination = 255;
-			  event.length = 8;
-			  event.outgoing = true;
-			  event.dataHex = "our TC claimed this address";
-			  event.timestampMs = steady_clock_ms();
-			  std::lock_guard<std::mutex> lock(busMutex);
-			  pendingBusFrames.push_back(std::move(event));
-		  });
 		if ("virtual" == settings.driver)
 		{
 			logs.addLine("[bus] WARNING: the 'virtual' driver is process-local. External simulators "
@@ -639,12 +559,6 @@ namespace agisotc
 		}
 		speedMessages.reset();
 		nmea2000.reset();
-		unregisterBusMonitor();
-		if (0 != addressClaimListener)
-		{
-			canBus.internal_control_function()->get_address_claimed_event_dispatcher().remove_listener(addressClaimListener);
-			addressClaimListener = 0;
-		}
 		unregisterGpsCanCallbacks();
 		canBus.stop();
 		for (auto &state : implementDdiStates) state.reportingConfigured = false;
@@ -2196,16 +2110,6 @@ namespace agisotc
 		speedMessages->machineSelectedSpeedTransmitData.set_limit_status(
 		  isobus::SpeedMessagesInterface::MachineSelectedSpeedData::LimitStatus::NotLimited);
 		speedMessages->update();
-		if (currentGps.valid)
-		{
-			using PGN = isobus::CANLibParameterGroupNumber;
-			const QString detail = QString("spd=%1mm/s dst=%2mm")
-			                         .arg(speedMmPerSec)
-			                         .arg(currentMachineDistanceMm);
-			logBusTx(static_cast<std::uint32_t>(PGN::MachineSelectedSpeed), 8, detail);
-			logBusTx(static_cast<std::uint32_t>(PGN::WheelBasedSpeedAndDistance), 8, detail);
-			logBusTx(static_cast<std::uint32_t>(PGN::GroundBasedSpeedAndDistance), 8, detail);
-		}
 	}
 
 	void TcBridge::updateGps()
@@ -2336,15 +2240,6 @@ namespace agisotc
 			gnss.set_gnss_method(mapFixQualityToGnssMethod(currentGps.fixQuality));
 		}
 		nmea2000->update();
-		if (currentGps.valid && currentGps.latitudeDeg.has_value() && currentGps.longitudeDeg.has_value())
-		{
-			const QString detail = QString("lat=%1 lon=%2")
-			                         .arg(*currentGps.latitudeDeg, 0, 'f', 7)
-			                         .arg(*currentGps.longitudeDeg, 0, 'f', 7);
-			logBusTx(129025, 8, detail);
-			logBusTx(129026, 8, detail);
-			logBusTx(129029, 32, detail);
-		}
 	}
 
 

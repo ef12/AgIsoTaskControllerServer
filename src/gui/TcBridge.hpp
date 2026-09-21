@@ -9,10 +9,7 @@
 
 #include <atomic>
 #include <cstdint>
-#include <deque>
-#include <map>
 #include <memory>
-#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -253,11 +250,7 @@ namespace agisotc
 		void updateNmea2000Gps();
 		void rebuildFieldBoundaryPoints();
 		static void processGpsCanMessage(const isobus::CANMessage &message, void *parentPointer);
-		void registerBusMonitor();
-		void unregisterBusMonitor();
 		void drainBusFrames();
-		void logBusTx(std::uint32_t pgn, std::uint32_t length, const QString &detail);
-		static void processBusMessage(const isobus::CANMessage &message, void *parentPointer);
 
 		CanBusManager canBus;
 		GpsProvider gpsProvider;
@@ -274,21 +267,6 @@ namespace agisotc
 		DdiTrafficModel ddiTraffic;
 		BusMonitorModel busMonitor;
 		LogModel logs;
-
-		struct BusFrameEvent
-		{
-			std::uint32_t pgn = 0;
-			int source = -1;
-			int destination = -1;
-			std::uint32_t length = 0;
-			QString dataHex;
-			std::uint64_t timestampMs = 0;
-			bool outgoing = false; ///< True for our own transmissions (no bus loopback).
-		};
-		std::mutex busMutex;
-		std::deque<BusFrameEvent> pendingBusFrames;
-		std::map<std::uint32_t, std::uint64_t> lastBusTxLogMs;
-		isobus::EventCallbackHandle addressClaimListener = 0;
 
 		bool running = false;
 		bool taskActive = false;
