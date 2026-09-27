@@ -1,8 +1,10 @@
+#include "CanBusManager.hpp"
 #include "FieldTaskManager.hpp"
 #include "GpsProvider.hpp"
 
 #include <cassert>
 #include <chrono>
+#include <string>
 #include <thread>
 
 int main()
@@ -46,5 +48,19 @@ int main()
 	assert(1 == loggedPoints);
 	assert(manager.stop_task(taskId));
 	assert(!manager.get_active_task().has_value());
+
+	// A CAN-API 2 network name is limited to 20 bytes; this must fail before any driver is opened.
+	agisotc::CanBusManager canBus;
+	agisotc::CanBusSettings pcanVirtual;
+	pcanVirtual.driver = "pcan_virtual";
+	pcanVirtual.channel = "network_name_over_20_bytes";
+	std::string error;
+	assert(!canBus.start(pcanVirtual, error));
+	assert(!canBus.is_running());
+#if defined(ISOBUS_WINDOWSCANAPI2_AVAILABLE)
+	assert(std::string::npos != error.find("between 1 and 20 bytes"));
+#else
+	assert(std::string::npos != error.find("not available"));
+#endif
 	return 0;
 }

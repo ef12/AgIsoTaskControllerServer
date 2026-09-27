@@ -10,6 +10,10 @@
 #include "isobus/hardware_integration/wcan_plugin.hpp"
 #endif
 
+#ifdef ISOBUS_WINDOWSCANAPI2_AVAILABLE
+#include "PcanVirtualNetwork.hpp"
+#endif
+
 namespace agisotc
 {
 	CanBusManager::~CanBusManager()
@@ -48,6 +52,30 @@ namespace agisotc
 			driverName = "PEAK PCAN-USB channel 1";
 #else
 			error = "PEAK PCAN-USB driver is not available in this build.";
+			return false;
+#endif
+		}
+		else if ("pcan_virtual" == settings.driver)
+		{
+#if defined(ISOBUS_WINDOWSCANAPI2_AVAILABLE)
+			// Register the named network persistently first, as AgIsoVirtualTerminal does, so
+			// applications that only join existing networks can start before or after us.
+			if (!ensure_pcan_virtual_network(settings.channel,
+			                                 isobus::CANAPI2WindowsPlugin::DEFAULT_BITRATE,
+			                                 isobus::CANAPI2WindowsPlugin::DEFAULT_NET_HANDLE,
+			                                 error))
+			{
+				return false;
+			}
+			driver = std::make_shared<isobus::CANAPI2WindowsPlugin>(settings.channel,
+			                                                        "AgIsoTCServer",
+			                                                        isobus::CANAPI2WindowsPlugin::DEFAULT_BITRATE,
+			                                                        true,
+			                                                        isobus::CANAPI2WindowsPlugin::DEFAULT_NET_HANDLE,
+			                                                        isobus::CANAPI2WindowsPlugin::DeviceType::Virtual);
+			driverName = "PEAK PCAN Virtual (" + settings.channel + ")";
+#else
+			error = "PEAK PCAN Virtual driver is not available in this build.";
 			return false;
 #endif
 		}

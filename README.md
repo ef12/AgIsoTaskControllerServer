@@ -21,7 +21,8 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
 - 3D section-control view: section boxes light up from a configurable section-state DDI
 - Event log console, TC identify banner
 - CAN drivers: WCAN shared-memory bus (Windows, cross-process), PCAN-USB
-  (Windows), process-local virtual CAN (tests), and SocketCAN (Linux)
+  (Windows), PEAK PCAN Virtual via CAN-API 2 (Windows, cross-process),
+  process-local virtual CAN (tests), and SocketCAN (Linux)
 
 ## Protocol notes
 
@@ -88,7 +89,13 @@ the GUI (`-DAGISOTC_BUILD_GUI=OFF` skips the Qt requirement).
 1. Pick a driver. On Windows, `wcan` plus a shared bus name (for example
    `big_planter_isobus`) connects separate applications without CAN hardware;
    every application must use the same bus name. Use `pcan_usb` for PEAK
-   PCAN-USB channel 1. The `virtual` driver is useful only for participants in
+   PCAN-USB channel 1. Use `pcan_virtual` plus a CAN-API 2 network name (1..20
+   bytes, default `PCANLight_USB`) to share a PEAK PCAN Virtual network with
+   AgIsoVirtualTerminal's **PEAK PCAN Virtual** option and other CAN-API 2
+   applications without CAN hardware. This requires the PEAK driver with its
+   CAN-API 2 runtime (`CanApi2.dll` in the Windows system directory). A missing
+   network is registered persistently at 250 kbit/s, so the applications can be
+   started in any order. The `virtual` driver is useful only for participants in
    the same process. On Linux, use `socketcan` plus an interface such as `can0`.
 2. Set TC number, booms, sections, channels; press **Start server**.
 3. Select a client, inspect its DDOP, watch live values, send commands.

@@ -19,8 +19,8 @@ namespace agisotc
 {
 	struct CanBusSettings
 	{
-		std::string driver = "virtual"; ///< "wcan", "pcan_usb", "virtual", or "socketcan".
-		std::string channel = "TC-Server"; ///< Bus name, or SocketCAN interface like "can0".
+		std::string driver = "virtual"; ///< "wcan", "pcan_usb", "pcan_virtual", "virtual", or "socketcan".
+		std::string channel = "TC-Server"; ///< Bus name, CAN-API 2 network name, or SocketCAN interface like "can0".
 		std::uint8_t tcNumber = 1; ///< Our TC number (function instance + 1, range 1..32).
 	};
 

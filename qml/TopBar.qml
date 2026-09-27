@@ -3,9 +3,14 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 RowLayout {
+    id: topBar
     spacing: 8
 
     signal openTaskDataRequested()
+
+    // Channel text per driver, so switching drivers keeps each bus/network name.
+    // PCAN Virtual defaults to the CAN-API 2 network name AgIsoVirtualTerminal uses.
+    property var channelPerDriver: ({ "pcan_virtual": "PCANLight_USB" })
 
     Label {
         text: "Driver:"
@@ -13,9 +18,18 @@ RowLayout {
     }
     ComboBox {
         id: driverBox
-        model: ["wcan", "pcan_usb", "virtual", "socketcan"]
+        property string previousDriver: ""
+        model: ["wcan", "pcan_usb", "pcan_virtual", "virtual", "socketcan"]
         enabled: !bridge.running
         Layout.preferredWidth: 130
+        Component.onCompleted: previousDriver = currentText
+        onActivated: {
+            topBar.channelPerDriver[previousDriver] = channelField.text;
+            if (topBar.channelPerDriver[currentText] !== undefined) {
+                channelField.text = topBar.channelPerDriver[currentText];
+            }
+            previousDriver = currentText;
+        }
     }
     Label {
         text: "Channel:"

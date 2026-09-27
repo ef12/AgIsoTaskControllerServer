@@ -625,6 +625,12 @@ namespace agisotc
 			logs.addLine("[bus] WARNING: the 'virtual' driver is process-local. External simulators "
 			             "on this machine cannot join it - use 'wcan' with the same bus name instead.");
 		}
+		else if ("pcan_virtual" == settings.driver)
+		{
+			logs.addLine(QString("[bus] PCAN Virtual network '%1' stays registered after exit. Use the same "
+			                     "network name in the VT and implement simulator; they can start in any order.")
+			               .arg(QString::fromStdString(settings.channel)));
+		}
 
 		// Broadcast our GPS/simulated motion as machine speed so implements
 		// and terminals on the bus pick up speed and distance. We sense the

@@ -11,6 +11,13 @@ option(AGISOTC_BUILD_TESTS "Build AgIsoTaskControllerServer tests" OFF)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# On Windows, "pcan_usb" uses PCAN-Basic and "pcan_virtual" uses the installed PEAK
+# CAN-API 2 runtime (CanApi2.dll, loaded at run time), like AgIsoVirtualTerminal.
+# The stack adds WCAN on Windows by itself. Pass -DCAN_DRIVER=... to override.
+if(WIN32 AND NOT CAN_DRIVER)
+  set(CAN_DRIVER "WindowsPCANBasic" "WindowsCANAPI2")
+endif()
+
 include(FetchContent)
 FetchContent_Declare(
   CAN_STACK
@@ -28,6 +35,9 @@ add_library(tcserver_core STATIC
   src/core/NmeaParser.cpp
   src/core/IsoGpsHandler.cpp
   src/core/FieldTracker.cpp)
+if("WindowsCANAPI2" IN_LIST CAN_DRIVER)
+  target_sources(tcserver_core PRIVATE src/core/PcanVirtualNetwork.cpp)
+endif()
 target_include_directories(tcserver_core PUBLIC src/core)
 target_link_libraries(tcserver_core
   PUBLIC
