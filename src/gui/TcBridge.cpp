@@ -816,6 +816,41 @@ namespace agisotc
 		}
 		serviceSectionControl(nowMs);
 		serviceRateControl(nowMs);
+		publishImplementModelIfDue(nowMs);
+	}
+
+	bool TcBridge::isShownElement(const ImplementElementState &element) const
+	{
+		using Type = isobus::task_controller_object::DeviceElementObject::Type;
+		const auto type = static_cast<Type>(element.type);
+		if ((Type::Connector == type) || (Type::Section == type)) return true;
+		if (Type::Device == type) return false;
+		const bool anySections = std::any_of(implementElementStates.cbegin(), implementElementStates.cend(),
+		                                     [](const ImplementElementState &other) { return static_cast<Type>(other.type) == Type::Section; });
+		if (!anySections) return true; // nothing else to draw the implement with
+		// A boom (or sub-boom) is an element with sections below it.
+		for (const auto &other : implementElementStates)
+		{
+			if (static_cast<Type>(other.type) != Type::Section) continue;
+			std::uint16_t parent = other.parentObjectId;
+			for (int depth = 0; depth < 16; ++depth)
+			{
+				if (parent == element.objectId) return true;
+				const auto next = std::find_if(implementElementStates.cbegin(), implementElementStates.cend(),
+				                               [parent](const ImplementElementState &candidate) { return candidate.objectId == parent; });
+				if ((next == implementElementStates.cend()) || (next->parentObjectId == parent)) break;
+				parent = next->parentObjectId;
+			}
+		}
+		return false;
+	}
+
+	void TcBridge::publishImplementModelIfDue(std::uint64_t nowMs)
+	{
+		if (implementModelDirty && ((nowMs - lastImplementPublishMs) >= IMPLEMENT_PUBLISH_MS))
+		{
+			publishImplementModel();
+		}
 	}
 
 	void TcBridge::refreshClients()
@@ -1123,6 +1158,7 @@ namespace agisotc
 
 		for (const auto &element : implementElementStates)
 		{
+			if (!isShownElement(element)) continue;
 			const auto offset = elementOffset(element);
 			QVariantMap row;
 			row["objectId"] = element.objectId;
@@ -1141,6 +1177,9 @@ namespace agisotc
 			elements.push_back(row);
 		}
 		currentImplementElements = elements;
+		implementElementRows.setRows(elements);
+		implementModelDirty = false;
+		lastImplementPublishMs = steady_clock_ms();
 
 		QVariantList ddis;
 		QVariantList basicData;
@@ -1255,7 +1294,8 @@ namespace agisotc
 			}
 			changed = true;
 		}
-		if (changed) publishImplementModel();
+		// Values arrive by the dozen per second: the views are refreshed from poll() instead.
+		if (changed) implementModelDirty = true;
 	}
 
 	void TcBridge::setAutoDdiSync(bool enabled)
@@ -2147,6 +2187,7 @@ namespace agisotc
 		coveragePositionValid = false;
 		coverage.clear();
 		coveragePatchList.clear();
+		changedPatches.clear();
 		openPatchBySection.assign(openPatchBySection.size(), -1);
 		sectionCentresValid = false;
 		publishCoverage(true);
@@ -2215,6 +2256,7 @@ namespace agisotc
 			lastSectionCentres.clear();
 			for (const auto &pose : poses) lastSectionCentres.push_back(pose.centre);
 			openPatchBySection.assign(poses.size(), -1);
+			sectionVelocities.assign(poses.size(), GroundPoint{});
 			sectionCentresValid = true;
 			return;
 		}
@@ -2222,6 +2264,18 @@ namespace agisotc
 		bool anyOn = false;
 		for (std::size_t i = 0; i < poses.size(); ++i)
 		{
+			// How the section itself moved: in a turn the outer sections go faster than the inner
+			// ones, and neither goes where the implement points. Smoothed over a few steps.
+			if (jumped)
+			{
+				sectionVelocities[i] = {};
+			}
+			else if (elapsedSeconds > 0.0)
+			{
+				const GroundPoint measured = { (poses[i].centre.x - lastSectionCentres[i].x) / elapsedSeconds,
+					                           (poses[i].centre.z - lastSectionCentres[i].z) / elapsedSeconds };
+				sectionVelocities[i] = { (sectionVelocities[i].x + measured.x) / 2.0, (sectionVelocities[i].z + measured.z) / 2.0 };
+			}
 			const bool on = (i < applied.size()) && applied[i];
 			if (on && !jumped)
 			{
@@ -2517,10 +2571,6 @@ namespace agisotc
 
 	std::vector<bool> TcBridge::wantedSectionStates(const std::vector<SectionPose> &poses, std::uint64_t nowMs) const
 	{
-		std::vector<bool> wanted(poses.size(), false);
-		const double speed = currentGps.speedMps.value_or(0.0);
-		if (speed < 0.3) return wanted; // standing still, nothing to apply
-
 		// Look ahead by the time the client needs to switch a section, so it switches on the edge.
 		double lookAheadS = 1.0;
 		for (const auto &state : implementDdiStates)
@@ -2530,42 +2580,15 @@ namespace agisotc
 				lookAheadS = std::clamp(static_cast<double>(state.value) / 1000.0, 0.2, 5.0);
 			}
 		}
-		const double heading = currentImplementCourse * DegreesToRadians;
-		const double forwardX = std::sin(heading);
-		const double forwardZ = -std::cos(heading);
-		const double rightX = std::cos(heading);
-		const double rightZ = std::sin(heading);
+		// Each section is predicted along its own measured motion, not the implement heading.
+		std::vector<SectionGround> sections;
+		sections.reserve(poses.size());
 		for (std::size_t i = 0; i < poses.size(); ++i)
 		{
-			const GroundPoint ahead = { poses[i].centre.x + (forwardX * speed * lookAheadS), poses[i].centre.z + (forwardZ * speed * lookAheadS) };
-			if (!insideFieldBoundary(ahead)) continue;
-			// Off when most of the section's width ahead was covered before (not by this pass).
-			int covered = 0;
-			for (const double across : { -0.3, 0.0, 0.3 })
-			{
-				const GroundPoint sample = { ahead.x + (rightX * across * poses[i].widthM), ahead.z + (rightZ * across * poses[i].widthM) };
-				if (coverage.is_covered(sample, nowMs, 1500)) ++covered;
-			}
-			wanted[i] = (covered < 2);
+			const GroundPoint velocity = (i < sectionVelocities.size()) ? sectionVelocities[i] : GroundPoint{};
+			sections.push_back({ poses[i].centre, velocity, poses[i].widthM });
 		}
-		return wanted;
-	}
-
-	bool TcBridge::insideFieldBoundary(GroundPoint point) const
-	{
-		if (boundaryLocal.size() < 3) return true; // no field boundary: work everywhere
-		bool inside = false;
-		for (std::size_t i = 0, j = boundaryLocal.size() - 1; i < boundaryLocal.size(); j = i++)
-		{
-			const auto &a = boundaryLocal[i];
-			const auto &b = boundaryLocal[j];
-			if (((a.z > point.z) != (b.z > point.z)) &&
-			    (point.x < ((b.x - a.x) * (point.z - a.z) / (b.z - a.z)) + a.x))
-			{
-				inside = !inside;
-			}
-		}
-		return inside;
+		return wanted_section_states(sections, lookAheadS, boundaryLocal, coverage, nowMs);
 	}
 
 	void TcBridge::extendCoveragePatch(std::size_t section, GroundPoint from, GroundPoint to, double widthM)
@@ -2583,6 +2606,7 @@ namespace agisotc
 			if ((std::abs(turn) < 3.0) && (length < 25.0) && (std::abs(patch.widthM - widthM) < 0.01))
 			{
 				patch.end = to;
+				if (static_cast<std::size_t>(open) < publishedPatchCount) changedPatches.insert(static_cast<std::size_t>(open));
 				return;
 			}
 		}
@@ -2600,10 +2624,7 @@ namespace agisotc
 		const auto nowMs = steady_clock_ms();
 		if (!force && ((nowMs - lastCoveragePublishMs) < 250)) return;
 		lastCoveragePublishMs = nowMs;
-		QVariantList patches;
-		patches.reserve(static_cast<qsizetype>(coveragePatchList.size()));
-		for (const auto &patch : coveragePatchList)
-		{
+		auto rowOf = [](const CoveragePatch &patch) {
 			const double dx = patch.end.x - patch.start.x;
 			const double dz = patch.end.z - patch.start.z;
 			const double length = std::hypot(dx, dz);
@@ -2613,10 +2634,40 @@ namespace agisotc
 			row["length"] = length;
 			row["width"] = patch.widthM;
 			row["course"] = (length > 0.01) ? (std::atan2(dx, -dz) / DegreesToRadians) : patch.courseDeg;
-			patches.push_back(row);
+			return row;
+		};
+		// Only what changed goes to the views: the patches extended since the last publish and
+		// the new ones. Rebuilding every patch made the 3D view recreate all of its models.
+		if (coveragePatchList.size() < publishedPatchCount)
+		{
+			currentCoveragePatches.clear();
+			coveragePatchRows.clear();
+			publishedPatchCount = 0;
 		}
-		currentCoveragePatches = patches;
+		for (const auto index : changedPatches)
+		{
+			const auto row = rowOf(coveragePatchList[index]);
+			currentCoveragePatches[static_cast<qsizetype>(index)] = row;
+			coveragePatchRows.setRow(static_cast<int>(index), row);
+		}
+		changedPatches.clear();
+		for (; publishedPatchCount < coveragePatchList.size(); ++publishedPatchCount)
+		{
+			const auto row = rowOf(coveragePatchList[publishedPatchCount]);
+			currentCoveragePatches.push_back(row);
+			coveragePatchRows.appendRow(row);
+		}
 		emit workChanged();
+	}
+
+	VariantListModel *TcBridge::coveragePatchModel()
+	{
+		return &coveragePatchRows;
+	}
+
+	VariantListModel *TcBridge::implementElementModel()
+	{
+		return &implementElementRows;
 	}
 
 	QVariantList TcBridge::coveragePatches() const

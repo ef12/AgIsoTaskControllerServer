@@ -1,6 +1,7 @@
 // Tests for the TC plan derived from a DDOP, the section controller and the coverage map.
 #include "CoverageMap.hpp"
 #include "SectionController.hpp"
+#include "SectionPlanner.hpp"
 #include "TcClientPlan.hpp"
 
 #include "isobus/isobus/isobus_standard_data_description_indices.hpp"
@@ -183,6 +184,36 @@ namespace
 		CHECK(controller.update(wanted, 3000).empty());
 	}
 
+	void test_section_planner()
+	{
+		using agisotc::SectionGround;
+		// A 100 m square field: x 0..100, z -100..0 (z grows to the south).
+		const std::vector<agisotc::GroundPoint> field = { { 0, 0 }, { 100, 0 }, { 100, -100 }, { 0, -100 }, { 0, 0 } };
+		agisotc::CoverageMap coverage(0.25);
+		auto one = [&](SectionGround section, const std::vector<agisotc::GroundPoint> &boundary = {}) {
+			return agisotc::wanted_section_states({ section }, 1.0, boundary.empty() ? field : boundary, coverage, 100000)[0];
+		};
+		const agisotc::GroundPoint north = { 0.0, -3.0 }; // 3 m/s towards the north
+		const agisotc::GroundPoint south = { 0.0, 3.0 };
+		const agisotc::GroundPoint east = { 3.0, 0.0 };
+
+		CHECK(one({ { 50, -50 }, north, 3.0 })); // in the field, moving
+		CHECK(!one({ { 50, -50 }, { 0.0, -0.1 }, 3.0 })); // standing still
+		CHECK(!one({ { 50, -98 }, north, 3.0 })); // leaves the field within the look-ahead
+		CHECK(one({ { 50, -101 }, south, 3.0 })); // about to enter: on at the edge
+		CHECK(!one({ { 50, -110 }, south, 3.0 })); // turning back, still far outside
+		// Outside, travelling along the edge in a headland turn: the implement may already point
+		// into the field, but the section itself does not reach it.
+		CHECK(!one({ { 50, -103 }, east, 3.0 }));
+		// No boundary: work everywhere.
+		CHECK(agisotc::wanted_section_states({ { { 500, 500 }, north, 3.0 } }, 1.0, {}, coverage, 100000)[0]);
+		// Ground covered by an earlier pass switches the section off.
+		coverage.cover_swath({ 40, -60 }, { 60, -60 }, 10.0, 1000);
+		CHECK(!one({ { 50, -57 }, north, 3.0 }));
+		CHECK(agisotc::point_in_ring({ 50, -50 }, field));
+		CHECK(!agisotc::point_in_ring({ 50, -103 }, field));
+	}
+
 	void test_coverage()
 	{
 		agisotc::CoverageMap coverage(0.25);
@@ -206,6 +237,7 @@ int main()
 	test_parse_by_client_version();
 	test_condensed_encoding();
 	test_section_controller();
+	test_section_planner();
 	test_coverage();
 	if (0 == failures) std::printf("tc_plan_tests: all passed\n");
 	return (0 == failures) ? 0 : 1;

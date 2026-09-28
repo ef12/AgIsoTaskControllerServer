@@ -112,14 +112,15 @@ GroupBox {
 
                 Node {
                     // TC coverage: the ground each section applied, one patch per straight stretch
+                    // A list model updated in place: new patches add models, the rest are kept.
                     Repeater3D {
-                        model: bridge.coveragePatches
+                        model: bridge.coveragePatchModel
                         delegate: Model {
                             source: "#Cube"
-                            position: Qt.vector3d(modelData.x, 0.04, modelData.z)
-                            eulerRotation.y: -modelData.course
-                            scale: Qt.vector3d(Math.max(0.002, modelData.width / 100), 0.0008,
-                                               Math.max(0.002, modelData.length / 100))
+                            position: Qt.vector3d(model.x, 0.04, model.z)
+                            eulerRotation.y: -model.course
+                            scale: Qt.vector3d(Math.max(0.002, model.width / 100), 0.0008,
+                                               Math.max(0.002, model.length / 100))
                             materials: PrincipledMaterial { baseColor: "#7cb342"; opacity: 0.72; roughness: 1.0 }
                         }
                     }
@@ -188,22 +189,23 @@ GroupBox {
                 Node {
                         position: Qt.vector3d(bridge.implementX, 0.8, bridge.implementZ)
                         eulerRotation.y: -bridge.implementCourse
+                        // The connector and the booms that carry sections, with their sections.
                         Repeater3D {
-                            model: bridge.implementElements
+                            model: bridge.implementElementModel
                             delegate: Model {
-                                source: modelData.type === 6 ? "#Cylinder" : "#Cube"
-                                position: Qt.vector3d(modelData.x,
-                                                      Math.max(0.08, modelData.y + modelData.height / 2),
-                                                      modelData.z)
-                                eulerRotation.x: modelData.type === 6 ? 90 : 0
-                                scale: Qt.vector3d(Math.max(0.002, modelData.width / 100),
-                                                   Math.max(0.002, modelData.height / 100),
-                                                   Math.max(0.002, modelData.length / 100))
+                                source: model.type === 6 ? "#Cylinder" : "#Cube"
+                                position: Qt.vector3d(model.x,
+                                                      Math.max(0.08, model.y + model.height / 2),
+                                                      model.z)
+                                eulerRotation.x: model.type === 6 ? 90 : 0
+                                scale: Qt.vector3d(Math.max(0.002, model.width / 100),
+                                                   Math.max(0.002, model.height / 100),
+                                                   Math.max(0.002, model.length / 100))
                                 materials: PrincipledMaterial {
-                                    baseColor: modelData.active ? "#f2d33c"
-                                                               : (modelData.type === 4 ? "#4ea8de"
-                                                                                       : (modelData.type === 3 ? "#d58c3b" : "#69747f"))
-                                    emissiveFactor: modelData.active ? Qt.vector3d(0.25, 0.20, 0.02) : Qt.vector3d(0, 0, 0)
+                                    baseColor: model.active ? "#f2d33c"
+                                                           : (model.type === 4 ? "#4ea8de"
+                                                                               : (model.type === 3 ? "#d58c3b" : "#69747f"))
+                                    emissiveFactor: model.active ? Qt.vector3d(0.25, 0.20, 0.02) : Qt.vector3d(0, 0, 0)
                                     metalness: 0.25
                                     roughness: 0.55
                                 }

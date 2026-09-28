@@ -27,6 +27,7 @@
 #include "FieldTaskManager.hpp"
 #include "GpsProvider.hpp"
 #include "SectionController.hpp"
+#include "SectionPlanner.hpp"
 #include "TcClientPlan.hpp"
 #include "TcModels.hpp"
 #include "TcServerCore.hpp"
@@ -63,6 +64,8 @@ namespace agisotc
 		Q_PROPERTY(QVariantList trackPoints READ trackPoints NOTIFY trackChanged)
 		Q_PROPERTY(QVariantList workedPoints READ workedPoints NOTIFY workChanged)
 		Q_PROPERTY(QVariantList coveragePatches READ coveragePatches NOTIFY workChanged)
+		Q_PROPERTY(VariantListModel *coveragePatchModel READ coveragePatchModel CONSTANT)
+		Q_PROPERTY(VariantListModel *implementElementModel READ implementElementModel CONSTANT)
 		Q_PROPERTY(bool autoSectionControl READ autoSectionControl NOTIFY sectionControlChanged)
 		Q_PROPERTY(QString sectionControlStatus READ sectionControlStatus NOTIFY sectionControlChanged)
 		Q_PROPERTY(QVariantList rateSetpoints READ rateSetpoints NOTIFY sectionControlChanged)
@@ -136,6 +139,8 @@ namespace agisotc
 		QVariantList trackPoints() const;
 		QVariantList workedPoints() const;
 		QVariantList coveragePatches() const;
+		VariantListModel *coveragePatchModel();
+		VariantListModel *implementElementModel();
 		bool autoSectionControl() const;
 		QString sectionControlStatus() const;
 		QVariantList rateSetpoints() const;
@@ -301,12 +306,17 @@ namespace agisotc
 		void serviceRateControl(std::uint64_t nowMs);
 		std::vector<SectionPose> sectionPoses() const;
 		std::vector<bool> wantedSectionStates(const std::vector<SectionPose> &poses, std::uint64_t nowMs) const;
+		/// @brief Rebuilds the implement lists for the views; poll() does it at most every
+		/// IMPLEMENT_PUBLISH_MS, however many values arrive in between.
+		void publishImplementModelIfDue(std::uint64_t nowMs);
+		/// @brief True for the elements the 3D view shows: the connector, and the booms that
+		/// carry sections, with those sections. A function without sections is no boom.
+		bool isShownElement(const ImplementElementState &element) const;
 		/// @brief Actual on/off of each plan section: as the client reports it, else as commanded.
 		std::vector<bool> appliedSectionStates() const;
 		/// @brief Offset of an element from the device reference point in metres (ISO axes: X
 		/// forward, Y right). A missing offset is taken from the nearest element above it.
 		std::array<double, 2> elementOffset(const ImplementElementState &element) const;
-		bool insideFieldBoundary(GroundPoint point) const;
 		void extendCoveragePatch(std::size_t section, GroundPoint from, GroundPoint to, double widthM);
 		void publishCoverage(bool force);
 
@@ -463,9 +473,19 @@ namespace agisotc
 		std::vector<CoveragePatch> coveragePatchList;
 		std::vector<int> openPatchBySection; ///< Patch a section is extending, -1 if none.
 		std::vector<GroundPoint> lastSectionCentres;
+		std::vector<GroundPoint> sectionVelocities; ///< How each section moved lately, m/s.
 		bool sectionCentresValid = false;
 		QVariantList currentCoveragePatches;
+		VariantListModel coveragePatchRows{ QStringList{ "x", "z", "length", "width", "course" } };
+		std::size_t publishedPatchCount = 0; ///< Patches the views already have
+		std::set<std::size_t> changedPatches; ///< Published patches extended since
 		std::uint64_t lastCoveragePublishMs = 0;
+
+		static constexpr std::uint64_t IMPLEMENT_PUBLISH_MS = 250;
+		VariantListModel implementElementRows{ QStringList{ "objectId", "element", "name", "type", "x", "y", "z",
+			                                                "width", "length", "height", "active", "hasGeometry" } };
+		bool implementModelDirty = false;
+		std::uint64_t lastImplementPublishMs = 0;
 		std::vector<GroundPoint> boundaryLocal; ///< Selected field's boundary in local metres.
 	};
 } // namespace agisotc

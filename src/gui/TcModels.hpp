@@ -8,6 +8,9 @@
 #include <QAbstractListModel>
 #include <QList>
 #include <QString>
+#include <QStringList>
+#include <QVariantList>
+#include <QVariantMap>
 #include <QVector>
 
 namespace agisotc
@@ -226,5 +229,34 @@ namespace agisotc
 	private:
 		QList<QString> lines;
 		static constexpr int MAX_LINES = 1000;
+	};
+
+	/// @brief Rows of named values that views such as Repeater3D show, updated in place: a
+	/// changed row sends dataChanged and new rows are inserted, so views keep their delegates
+	/// instead of rebuilding all of them on every update. Delegates read roles as model.<name>.
+	class VariantListModel : public QAbstractListModel
+	{
+		Q_OBJECT
+		Q_PROPERTY(int count READ count NOTIFY countChanged)
+	public:
+		explicit VariantListModel(const QStringList &roles, QObject *parent = nullptr);
+
+		int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+		QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+		QHash<int, QByteArray> roleNames() const override;
+
+		int count() const;
+		/// @brief Replaces all rows, telling views only which rows changed, came or went.
+		void setRows(const QVariantList &newRows);
+		void setRow(int index, const QVariantMap &row);
+		void appendRow(const QVariantMap &row);
+		void clear();
+
+	signals:
+		void countChanged();
+
+	private:
+		QStringList keys;
+		QList<QVariantMap> rows;
 	};
 } // namespace agisotc

@@ -1,5 +1,7 @@
 #include "TcModels.hpp"
 
+#include <algorithm>
+
 namespace agisotc
 {
 	ClientListModel::ClientListModel(QObject *parent) :
@@ -378,5 +380,83 @@ namespace agisotc
 		beginResetModel();
 		lines.clear();
 		endResetModel();
+	}
+	VariantListModel::VariantListModel(const QStringList &roles, QObject *parent) :
+	  QAbstractListModel(parent),
+	  keys(roles)
+	{
+	}
+
+	int VariantListModel::rowCount(const QModelIndex &parent) const
+	{
+		return parent.isValid() ? 0 : static_cast<int>(rows.size());
+	}
+
+	QVariant VariantListModel::data(const QModelIndex &index, int role) const
+	{
+		const int key = role - (Qt::UserRole + 1);
+		if (!index.isValid() || (index.row() >= rows.size()) || (key < 0) || (key >= keys.size())) return {};
+		return rows.at(index.row()).value(keys.at(key));
+	}
+
+	QHash<int, QByteArray> VariantListModel::roleNames() const
+	{
+		QHash<int, QByteArray> names;
+		for (int i = 0; i < keys.size(); ++i) names.insert(Qt::UserRole + 1 + i, keys.at(i).toUtf8());
+		return names;
+	}
+
+	int VariantListModel::count() const
+	{
+		return static_cast<int>(rows.size());
+	}
+
+	void VariantListModel::setRows(const QVariantList &newRows)
+	{
+		const int oldCount = static_cast<int>(rows.size());
+		const int newCount = static_cast<int>(newRows.size());
+		for (int i = 0; i < std::min(oldCount, newCount); ++i)
+		{
+			setRow(i, newRows.at(i).toMap());
+		}
+		if (newCount > oldCount)
+		{
+			beginInsertRows(QModelIndex(), oldCount, newCount - 1);
+			for (int i = oldCount; i < newCount; ++i) rows.push_back(newRows.at(i).toMap());
+			endInsertRows();
+			emit countChanged();
+		}
+		else if (newCount < oldCount)
+		{
+			beginRemoveRows(QModelIndex(), newCount, oldCount - 1);
+			rows.erase(rows.begin() + newCount, rows.end());
+			endRemoveRows();
+			emit countChanged();
+		}
+	}
+
+	void VariantListModel::setRow(int index, const QVariantMap &row)
+	{
+		if ((index < 0) || (index >= rows.size()) || (rows.at(index) == row)) return;
+		rows[index] = row;
+		emit dataChanged(this->index(index), this->index(index));
+	}
+
+	void VariantListModel::appendRow(const QVariantMap &row)
+	{
+		const int at = static_cast<int>(rows.size());
+		beginInsertRows(QModelIndex(), at, at);
+		rows.push_back(row);
+		endInsertRows();
+		emit countChanged();
+	}
+
+	void VariantListModel::clear()
+	{
+		if (rows.isEmpty()) return;
+		beginResetModel();
+		rows.clear();
+		endResetModel();
+		emit countChanged();
 	}
 } // namespace agisotc
