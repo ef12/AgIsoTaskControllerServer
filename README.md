@@ -99,7 +99,7 @@ from the repo root):
 
 ```powershell
 git clone https://github.com/ef12/AgIsoStack-plus-plus.git _dependencies/AgIsoStack-plus-plus
-git -C _dependencies/AgIsoStack-plus-plus checkout 1eb0a89f21e0c2ea57a2c63b93a7d3b2218bc66f
+git -C _dependencies/AgIsoStack-plus-plus checkout 9a320161189c2015a762c5f81dd346f4c167905f
 git clone https://github.com/ef12/SIL.git _dependencies/SIL
 git -C _dependencies/SIL checkout d8a869322c7a782bb197662deff67045dc353c7c
 $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/vswhere.exe"
