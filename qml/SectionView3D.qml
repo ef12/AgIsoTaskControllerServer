@@ -97,20 +97,6 @@ GroupBox {
                     }
                 }
 
-                Node {
-                    Repeater3D {
-                        model: bridge.trackPoints
-                        delegate: Model {
-                            source: "#Sphere"
-                            position: Qt.vector3d(modelData.x, 0.18, modelData.z)
-                            scale: Qt.vector3d(0.007, 0.003, 0.007)
-                            materials: PrincipledMaterial {
-                                baseColor: "#34b7ff"
-                                emissiveFactor: Qt.vector3d(0.08, 0.25, 0.4)
-                            }
-                        }
-                    }
-                }
 
                 Node {
                     Repeater3D {
@@ -125,13 +111,15 @@ GroupBox {
                 }
 
                 Node {
+                    // TC coverage: the ground each section applied, one patch per straight stretch
                     Repeater3D {
-                        model: bridge.workedPoints
+                        model: bridge.coveragePatches
                         delegate: Model {
                             source: "#Cube"
                             position: Qt.vector3d(modelData.x, 0.04, modelData.z)
                             eulerRotation.y: -modelData.course
-                            scale: Qt.vector3d(Math.max(0.006, modelData.width / 100), 0.0008, 0.012)
+                            scale: Qt.vector3d(Math.max(0.002, modelData.width / 100), 0.0008,
+                                               Math.max(0.002, modelData.length / 100))
                             materials: PrincipledMaterial { baseColor: "#7cb342"; opacity: 0.72; roughness: 1.0 }
                         }
                     }

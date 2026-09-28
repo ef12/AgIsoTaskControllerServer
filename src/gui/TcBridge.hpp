@@ -7,6 +7,7 @@
 //================================================================================================
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <map>
@@ -22,8 +23,11 @@
 #include <QVariantList>
 
 #include "CanBusManager.hpp"
+#include "CoverageMap.hpp"
 #include "FieldTaskManager.hpp"
 #include "GpsProvider.hpp"
+#include "SectionController.hpp"
+#include "TcClientPlan.hpp"
 #include "TcModels.hpp"
 #include "TcServerCore.hpp"
 
@@ -58,6 +62,10 @@ namespace agisotc
 		Q_PROPERTY(double tractorZ READ tractorZ NOTIFY gpsChanged)
 		Q_PROPERTY(QVariantList trackPoints READ trackPoints NOTIFY trackChanged)
 		Q_PROPERTY(QVariantList workedPoints READ workedPoints NOTIFY workChanged)
+		Q_PROPERTY(QVariantList coveragePatches READ coveragePatches NOTIFY workChanged)
+		Q_PROPERTY(bool autoSectionControl READ autoSectionControl NOTIFY sectionControlChanged)
+		Q_PROPERTY(QString sectionControlStatus READ sectionControlStatus NOTIFY sectionControlChanged)
+		Q_PROPERTY(QVariantList rateSetpoints READ rateSetpoints NOTIFY sectionControlChanged)
 		Q_PROPERTY(QVariantList fieldBoundaryPoints READ fieldBoundaryPoints NOTIFY boundaryChanged)
 		Q_PROPERTY(bool boundaryRecording READ boundaryRecording NOTIFY boundaryChanged)
 		Q_PROPERTY(int boundaryPointCount READ boundaryPointCount NOTIFY boundaryChanged)
@@ -127,6 +135,10 @@ namespace agisotc
 		double tractorZ() const;
 		QVariantList trackPoints() const;
 		QVariantList workedPoints() const;
+		QVariantList coveragePatches() const;
+		bool autoSectionControl() const;
+		QString sectionControlStatus() const;
+		QVariantList rateSetpoints() const;
 		QVariantList fieldBoundaryPoints() const;
 		bool boundaryRecording() const;
 		int boundaryPointCount() const;
@@ -208,6 +220,11 @@ namespace agisotc
 		Q_INVOKABLE void adjustThrottle(double deltaKph);
 		Q_INVOKABLE void stopTractor();
 		Q_INVOKABLE void clearWorkedArea();
+		/// @brief Lets the TC switch the client's sections while a task is active (TC-SC).
+		Q_INVOKABLE void setAutoSectionControl(bool enabled);
+		/// @brief Rate the TC commands for one of the client's rate setpoints while a task is
+		/// active, in the DDOP's raw unit (0 sends nothing).
+		Q_INVOKABLE void setRateTarget(int index, int value);
 
 	signals:
 		void runningChanged();
@@ -228,6 +245,7 @@ namespace agisotc
 		void boundaryChanged();
 		void busPeersChanged();
 		void workChanged();
+		void sectionControlChanged();
 		void drivingControlsChanged();
 		void identifyBanner(int tcNumber);
 
@@ -260,6 +278,37 @@ namespace agisotc
 		                              std::uint16_t element, std::int32_t value);
 		static void processGpsCanMessage(const isobus::CANMessage &message, void *parentPointer);
 		void drainBusFrames();
+
+		// --- TC controller (TC-BAS set-up, TC-SC, rate control) for the selected client ---
+
+		struct ImplementElementState;
+
+		/// @brief A section on the ground now: its centre and width.
+		struct SectionPose
+		{
+			GroundPoint centre;
+			double widthM = 0.0;
+		};
+
+		/// @brief Builds the plan from the selected client's active pool and sends its set-up.
+		void setupClientPlan();
+		/// @brief Sends the plan's set-up again (at activation, and at every task start, since
+		/// a client may drop its measurements when the task stops).
+		void sendSetupCommands();
+		void sendTcCommands(const std::vector<TcCommand> &commands);
+		/// @brief Engages section control while a task is active and sends the wanted states.
+		void serviceSectionControl(std::uint64_t nowMs);
+		void serviceRateControl(std::uint64_t nowMs);
+		std::vector<SectionPose> sectionPoses() const;
+		std::vector<bool> wantedSectionStates(const std::vector<SectionPose> &poses, std::uint64_t nowMs) const;
+		/// @brief Actual on/off of each plan section: as the client reports it, else as commanded.
+		std::vector<bool> appliedSectionStates() const;
+		/// @brief Offset of an element from the device reference point in metres (ISO axes: X
+		/// forward, Y right). A missing offset is taken from the nearest element above it.
+		std::array<double, 2> elementOffset(const ImplementElementState &element) const;
+		bool insideFieldBoundary(GroundPoint point) const;
+		void extendCoveragePatch(std::size_t section, GroundPoint from, GroundPoint to, double widthM);
+		void publishCoverage(bool force);
 
 		CanBusManager canBus;
 		GpsProvider gpsProvider;
@@ -335,6 +384,8 @@ namespace agisotc
 			double length = 0.0;
 			double height = 0.0;
 			bool hasGeometry = false;
+			bool hasOffsetX = false; ///< The DDOP gives this element an X offset of its own.
+			bool hasOffsetY = false; ///< The DDOP gives this element a Y offset of its own.
 			bool active = false;
 		};
 
@@ -385,5 +436,36 @@ namespace agisotc
 		bool coveragePositionValid = false;
 		std::vector<std::uint8_t> manualPool; ///< Manually loaded pool file for the selected client.
 		int manualPoolClient = -1;
+
+		// TC controller state, for the client in planClient.
+		SectionController sectionController;
+		int planClient = -1;
+		std::uint64_t pendingSetupAtMs = 0; ///< When to send the set-up again, 0 if not due.
+		int supportedBooms = 0; ///< What this TC reports it supports, from startServer().
+		int supportedSections = 0;
+		int supportedChannels = 0;
+		bool autoSectionControlEnabled = true;
+		QString currentSectionControlStatus = "No client";
+		std::vector<int> rateTargets; ///< Per plan rate setpoint, raw DDOP unit, 0 = not commanded.
+		std::vector<int> lastRateSent;
+		bool rateControlEngaged = false;
+		std::uint64_t lastRateSentMs = 0;
+
+		// Coverage: a grid for section control and area, and patches for the map views.
+		struct CoveragePatch
+		{
+			GroundPoint start;
+			GroundPoint end;
+			double widthM = 0.0;
+			double courseDeg = 0.0;
+		};
+		CoverageMap coverage;
+		std::vector<CoveragePatch> coveragePatchList;
+		std::vector<int> openPatchBySection; ///< Patch a section is extending, -1 if none.
+		std::vector<GroundPoint> lastSectionCentres;
+		bool sectionCentresValid = false;
+		QVariantList currentCoveragePatches;
+		std::uint64_t lastCoveragePublishMs = 0;
+		std::vector<GroundPoint> boundaryLocal; ///< Selected field's boundary in local metres.
 	};
 } // namespace agisotc

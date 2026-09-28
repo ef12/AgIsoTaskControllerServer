@@ -468,6 +468,22 @@ namespace agisotc
 			{
 				const auto ourControl = canBus.internal_control_function();
 				const int ourAddress = (nullptr != ourControl) ? static_cast<int>(ourControl->get_address()) : -1;
+				if (!frame.outgoing && (destination == ourAddress) && (0x10 == frame.data[0]))
+				{
+					// A client's version message: say when it has more than this TC offers, since
+					// a client then limits the booms, sections or channels it lets the TC control.
+					const int clientBooms = frame.data[5];
+					const int clientSections = frame.data[6];
+					const int clientChannels = frame.data[7];
+					QString line = QString("[tc] Client %1 reports TC version %2: %3 booms, %4 sections, %5 channels (this TC: %6, %7, %8).")
+					                 .arg(source).arg(frame.data[1]).arg(clientBooms).arg(clientSections).arg(clientChannels)
+					                 .arg(supportedBooms).arg(supportedSections).arg(supportedChannels);
+					if ((clientBooms > supportedBooms) || (clientSections > supportedSections) || (clientChannels > supportedChannels))
+					{
+						line += " The client may hold back what exceeds this; restart the server with larger numbers to offer it all.";
+					}
+					logs.addLine(line);
+				}
 				if ((source == ourAddress) || (destination == ourAddress))
 				{
 					const std::uint8_t command = frame.data[0] & 0x0F;
@@ -664,6 +680,9 @@ namespace agisotc
 		                 .with_implement_section_control()
 		                 .with_tc_geo_with_position_based_control();
 
+		supportedBooms = booms;
+		supportedSections = sections;
+		supportedChannels = channels;
 		server = std::make_shared<GuiTaskControllerServer>(
 		  canBus.internal_control_function(),
 		  static_cast<std::uint8_t>(booms),
@@ -691,6 +710,11 @@ namespace agisotc
 		{
 			return;
 		}
+		// Hand the client back to manual control rather than leaving it following a TC that is gone.
+		if (sectionController.engaged())
+		{
+			sendTcCommands(sectionController.set_engaged(false, steady_clock_ms()));
+		}
 		pumpRunning = false;
 		if (pumpThread.joinable())
 		{
@@ -707,6 +731,12 @@ namespace agisotc
 		canBus.stop();
 		for (auto &state : implementDdiStates) state.reportingConfigured = false;
 		lastDdiSyncMs = 0;
+		sectionController.reset({});
+		planClient = -1;
+		rateControlEngaged = false;
+		pendingSetupAtMs = 0;
+		currentSectionControlStatus = "No client";
+		emit sectionControlChanged();
 		running = false;
 		emit runningChanged();
 		setStatus("Server stopped.");
@@ -754,6 +784,7 @@ namespace agisotc
 			// Refresh lightweight fields (last-seen, status) while keeping selection stable.
 			refreshClients();
 		}
+		bool planNeeded = (planClient != currentSelectedClient);
 		if (!events.poolsChanged.empty())
 		{
 			for (const auto address : events.poolsChanged)
@@ -763,14 +794,28 @@ namespace agisotc
 					manualPool.clear();
 					manualPoolClient = -1;
 					refreshDdop();
+					planNeeded = true; // the client (re)activated its pool
 				}
 			}
+		}
+		if (planNeeded)
+		{
+			setupClientPlan();
 		}
 		if (events.identifyRequested)
 		{
 			emit identifyBanner(events.identifyNumber);
 		}
 		serviceDdiSync();
+
+		const auto nowMs = steady_clock_ms();
+		if ((0 != pendingSetupAtMs) && (nowMs >= pendingSetupAtMs))
+		{
+			pendingSetupAtMs = 0;
+			sendSetupCommands();
+		}
+		serviceSectionControl(nowMs);
+		serviceRateControl(nowMs);
 	}
 
 	void TcBridge::refreshClients()
@@ -854,8 +899,8 @@ namespace agisotc
 		else
 		{
 			isobus::DeviceDescriptorObjectPool pool;
-			std::vector<std::uint8_t> copy = binary;
-			if (!pool.deserialize_binary_object_pool(copy))
+			const auto clientVersion = (nullptr != server) ? server->client_version(static_cast<std::uint8_t>(currentSelectedClient)) : 0;
+			if (0 == parse_client_pool(binary, clientVersion, pool))
 			{
 				rows.push_back({ 0, QString("Stored %1 bytes, but parsing failed.").arg(binary.size()) });
 			}
@@ -971,7 +1016,7 @@ namespace agisotc
 			auto object = pool.get_object_by_id(elementState.objectId);
 			auto *element = dynamic_cast<DeviceElementObject *>(object.get());
 			if (nullptr == element) continue;
-			for (const auto childId : element->get_child_object_ids())
+			for (const auto childId : child_object_ids(*element))
 			{
 				auto child = pool.get_object_by_id(childId);
 				if (auto *property = dynamic_cast<DevicePropertyObject *>(child.get()))
@@ -981,8 +1026,8 @@ namespace agisotc
 					const double metres = geometry_value_metres(pool, property->get_value(), property->get_device_value_presentation_object_id());
 					switch (kind)
 					{
-						case 1: elementState.localX = metres; break;
-						case 2: elementState.localY = metres; break;
+						case 1: elementState.localX = metres; elementState.hasOffsetX = true; break;
+						case 2: elementState.localY = metres; elementState.hasOffsetY = true; break;
 						case 3: elementState.localZ = metres; break;
 						case 4: elementState.width = std::abs(metres); break;
 						case 5: elementState.length = std::abs(metres); break;
@@ -1062,44 +1107,32 @@ namespace agisotc
 	void TcBridge::publishImplementModel()
 	{
 		QVariantList elements;
-		std::map<std::uint16_t, const ImplementElementState *> byObject;
-		for (const auto &element : implementElementStates) byObject[element.objectId] = &element;
-		auto absolutePosition = [&byObject](const ImplementElementState &element) {
-			std::array<double, 3> position = { element.localX, element.localY, element.localZ };
-			std::uint16_t parent = element.parentObjectId;
-			for (int depth = 0; depth < 16; ++depth)
-			{
-				auto found = byObject.find(parent);
-				if (found == byObject.end()) break;
-				position[0] += found->second->localX;
-				position[1] += found->second->localY;
-				position[2] += found->second->localZ;
-				parent = found->second->parentObjectId;
-			}
-			return position;
-		};
-		std::array<double, 3> connectorPosition = { 0.0, 0.0, 0.0 };
+		// ISO 11783-10 gives element offsets from the device reference point, not from the parent
+		// element; an element without an offset of its own sits where the element above it is.
+		std::array<double, 2> connectorOffset = { 0.0, 0.0 };
+		double connectorZ = 0.0;
 		for (const auto &element : implementElementStates)
 		{
 			if (element.type == static_cast<int>(isobus::task_controller_object::DeviceElementObject::Type::Connector))
 			{
-				connectorPosition = absolutePosition(element);
+				connectorOffset = elementOffset(element);
+				connectorZ = element.localZ;
 				break;
 			}
 		}
 
 		for (const auto &element : implementElementStates)
 		{
-			const auto position = absolutePosition(element);
+			const auto offset = elementOffset(element);
 			QVariantMap row;
 			row["objectId"] = element.objectId;
 			row["element"] = element.element;
 			row["name"] = element.name;
 			row["type"] = element.type;
-			// ISO: X longitudinal, Y lateral, Z vertical. Scene: X lateral, Z rearward.
-			row["x"] = -(position[1] - connectorPosition[1]);
-			row["y"] = position[2] - connectorPosition[2];
-			row["z"] = -(position[0] - connectorPosition[0]);
+			// ISO: X forward, Y to the right, Z vertical. Scene (front is -Z): X right, Z rearward.
+			row["x"] = offset[1] - connectorOffset[1];
+			row["y"] = element.localZ - connectorZ;
+			row["z"] = -(offset[0] - connectorOffset[0]);
 			row["width"] = element.width;
 			row["length"] = element.length;
 			row["height"] = element.height;
@@ -1170,8 +1203,8 @@ namespace agisotc
 					if (geometry.element != element) continue;
 					switch (state.geometryKind)
 					{
-						case 1: geometry.localX = metres; break;
-						case 2: geometry.localY = metres; break;
+						case 1: geometry.localX = metres; geometry.hasOffsetX = true; break;
+						case 2: geometry.localY = metres; geometry.hasOffsetY = true; break;
 						case 3: geometry.localZ = metres; break;
 						case 4: geometry.width = std::abs(metres); break;
 						case 5: geometry.length = std::abs(metres); break;
@@ -1179,6 +1212,7 @@ namespace agisotc
 					}
 					geometry.hasGeometry = true;
 				}
+				currentImplementGeometryStatus = QString("Geometry from the client's process data, %1 elements").arg(implementElementStates.size());
 			}
 			changed = true;
 		}
@@ -1191,20 +1225,33 @@ namespace agisotc
 			}
 			changed = true;
 		}
-		const auto firstCondensed = static_cast<std::uint16_t>(DDI::ActualCondensedWorkState1_16);
-		const auto lastCondensed = static_cast<std::uint16_t>(DDI::ActualCondensedWorkState241_256);
-		if ((ddi >= firstCondensed) && (ddi <= lastCondensed))
+		if (is_actual_condensed_work_state(ddi))
 		{
-			std::vector<ImplementElementState *> sections;
-			for (auto &geometry : implementElementStates)
+			// A condensed work state covers the sections of the boom that reports it, so with
+			// several booms each one's value applies to its own sections only.
+			std::vector<std::uint16_t> boomSections;
+			for (const auto &boom : sectionController.plan().booms)
 			{
-				if (geometry.type == static_cast<int>(isobus::task_controller_object::DeviceElementObject::Type::Section)) sections.push_back(&geometry);
+				if (boom.element == element) boomSections = boom.sections;
 			}
-			std::sort(sections.begin(), sections.end(), [](const auto *left, const auto *right) { return left->element < right->element; });
-			const std::size_t base = static_cast<std::size_t>(ddi - firstCondensed) * 16;
-			for (std::size_t i = 0; (i < 16) && ((base + i) < sections.size()); ++i)
+			if (boomSections.empty())
 			{
-				sections[base + i]->active = (((static_cast<std::uint32_t>(value) >> (i * 2)) & 0x03U) == 1U);
+				// No plan for this element: fall back to the device's sections in element order.
+				for (const auto &geometry : implementElementStates)
+				{
+					if (geometry.type == static_cast<int>(isobus::task_controller_object::DeviceElementObject::Type::Section)) boomSections.push_back(geometry.element);
+				}
+				std::sort(boomSections.begin(), boomSections.end());
+			}
+			const auto firstCondensed = static_cast<std::uint16_t>(DDI::ActualCondensedWorkState1_16);
+			const std::size_t base = static_cast<std::size_t>(ddi - firstCondensed) * 16;
+			const auto states = decode_condensed_work_state(static_cast<std::uint32_t>(value), 16);
+			for (std::size_t i = 0; (i < states.size()) && ((base + i) < boomSections.size()); ++i)
+			{
+				for (auto &geometry : implementElementStates)
+				{
+					if (geometry.element == boomSections[base + i]) geometry.active = states[i];
+				}
 			}
 			changed = true;
 		}
@@ -1265,6 +1312,8 @@ namespace agisotc
 		int sentCount = 0;
 		for (const auto &state : implementDdiStates)
 		{
+			// Request Default Process Data is a command, not a value: the plan's set-up sends it.
+			if (state.ddi == static_cast<std::uint16_t>(isobus::DataDescriptionIndex::RequestDefaultProcessData)) continue;
 			if (server->send_request_value(client, state.ddi, state.element))
 			{
 				++sentCount;
@@ -1288,6 +1337,11 @@ namespace agisotc
 		for (std::size_t count = 0; count < batch; ++count)
 		{
 			auto &state = implementDdiStates[nextDdiSyncIndex % implementDdiStates.size()];
+			if (state.ddi == static_cast<std::uint16_t>(isobus::DataDescriptionIndex::RequestDefaultProcessData))
+			{
+				++nextDdiSyncIndex; // a command, not a value to poll
+				continue;
+			}
 			if (!state.reportingConfigured && (state.triggers & static_cast<std::uint8_t>(Trigger::TimeInterval)))
 			{
 				state.reportingConfigured = server->send_time_interval_measurement_command(
@@ -1446,7 +1500,8 @@ namespace agisotc
 		const auto data = file.readAll();
 		isobus::DeviceDescriptorObjectPool pool;
 		std::vector<std::uint8_t> binary(data.begin(), data.end());
-		if (!pool.deserialize_binary_object_pool(binary))
+		const auto clientVersion = (nullptr != server) ? server->client_version(static_cast<std::uint8_t>(currentSelectedClient)) : 0;
+		if (0 == parse_client_pool(binary, clientVersion, pool))
 		{
 			setStatus("Pool file could not be parsed as a DDOP.");
 			logs.addLine(QString("[ddop] Failed to parse %1.").arg(fileUrl.toLocalFile()));
@@ -1686,8 +1741,12 @@ namespace agisotc
 		emit tasksChanged();
 		setStatus(QString("Task '%1' is active.").arg(currentActiveTaskName));
 		logs.addLine(QString("[task] Started %1.").arg(currentActiveTaskName));
-		// Many implements only report process data while a task is active.
+		// Many implements only report process data while a task is active, and may have dropped
+		// their measurements when the last task stopped. They see the task only in the next TC
+		// status message, so the set-up goes out now and once more after that message.
 		requestImplementDdis();
+		sendSetupCommands();
+		pendingSetupAtMs = steady_clock_ms() + 2500;
 	}
 
 	void TcBridge::pauseSelectedTask()
@@ -2086,12 +2145,17 @@ namespace agisotc
 		currentWorkedDistanceM = 0.0;
 		currentWorkedTimeSeconds = 0.0;
 		coveragePositionValid = false;
-		emit workChanged();
+		coverage.clear();
+		coveragePatchList.clear();
+		openPatchBySection.assign(openPatchBySection.size(), -1);
+		sectionCentresValid = false;
+		publishCoverage(true);
 	}
 
 	void TcBridge::rebuildFieldBoundaryPoints()
 	{
 		currentFieldBoundaryPoints.clear();
+		boundaryLocal.clear();
 		std::vector<std::pair<double, double>> points;
 		if (boundaryRecordingFlag)
 		{
@@ -2109,6 +2173,10 @@ namespace agisotc
 			point["x"] = (longitude - fieldOriginLongitude) * DegreesToRadians * EarthRadiusM * std::cos(fieldOriginLatitude * DegreesToRadians);
 			point["z"] = -(latitude - fieldOriginLatitude) * DegreesToRadians * EarthRadiusM;
 			currentFieldBoundaryPoints.push_back(point);
+			if (!boundaryRecordingFlag)
+			{
+				boundaryLocal.push_back({ point["x"].toDouble(), point["z"].toDouble() });
+			}
 		}
 		emit boundaryChanged();
 	}
@@ -2132,42 +2200,470 @@ namespace agisotc
 
 	void TcBridge::updateWorkCoverage(double elapsedSeconds)
 	{
+		const auto nowMs = steady_clock_ms();
 		const double distance = coveragePositionValid ? std::hypot(currentImplementX - lastCoverageX, currentImplementZ - lastCoverageZ) : 0.0;
 		lastCoverageX = currentImplementX;
 		lastCoverageZ = currentImplementZ;
 		coveragePositionValid = true;
-		// Accrue when our task is active, or whenever the client itself reports
-		// sections ON (covers implements worked without an app-side task).
-		if ((!taskActive && (activeSectionCount() == 0)) || (distance > 10.0)) return;
-		double activeWidth = 0.0;
-		for (const auto &element : implementElementStates)
+
+		// Coverage is what the sections applied: each section that is on paints the ground its
+		// centre swept since the last step, over its own width.
+		const auto poses = sectionPoses();
+		const auto applied = appliedSectionStates();
+		if (!sectionCentresValid || (lastSectionCentres.size() != poses.size()))
 		{
-			if ((element.type == static_cast<int>(isobus::task_controller_object::DeviceElementObject::Type::Section)) && element.active)
+			lastSectionCentres.clear();
+			for (const auto &pose : poses) lastSectionCentres.push_back(pose.centre);
+			openPatchBySection.assign(poses.size(), -1);
+			sectionCentresValid = true;
+			return;
+		}
+		const bool jumped = distance > 10.0; // a position jump is not driven ground
+		bool anyOn = false;
+		for (std::size_t i = 0; i < poses.size(); ++i)
+		{
+			const bool on = (i < applied.size()) && applied[i];
+			if (on && !jumped)
 			{
-				activeWidth += element.width;
+				coverage.cover_swath(lastSectionCentres[i], poses[i].centre, poses[i].widthM, nowMs);
+				extendCoveragePatch(i, lastSectionCentres[i], poses[i].centre, poses[i].widthM);
+				anyOn = true;
+			}
+			else
+			{
+				openPatchBySection[i] = -1;
+			}
+			lastSectionCentres[i] = poses[i].centre;
+		}
+		if (anyOn)
+		{
+			currentWorkedDistanceM += distance;
+			currentWorkedTimeSeconds += elapsedSeconds;
+		}
+		currentWorkedAreaHa = coverage.covered_area_m2() / 10000.0;
+		publishCoverage(false);
+	}
+
+	// --- TC controller ---------------------------------------------------------------------
+
+	void TcBridge::setupClientPlan()
+	{
+		const auto nowMs = steady_clock_ms();
+		if (sectionController.engaged())
+		{
+			sendTcCommands(sectionController.set_engaged(false, nowMs)); // previous client back to manual
+		}
+		planClient = currentSelectedClient;
+		ClientPlan plan;
+		if ((nullptr != server) && (planClient >= 0))
+		{
+			const auto address = static_cast<std::uint8_t>(planClient);
+			isobus::DeviceDescriptorObjectPool pool;
+			if (0 != parse_client_pool(server->stored_pool(address), server->client_version(address), pool))
+			{
+				plan = build_client_plan(pool);
 			}
 		}
-		if (activeWidth <= 0.0) activeWidth = static_cast<double>(activeSectionCount());
-		currentWorkedDistanceM += distance;
-		currentWorkedAreaHa += (distance * activeWidth) / 10000.0;
-		currentWorkedTimeSeconds += elapsedSeconds;
-		bool appendCoverage = currentWorkedPoints.isEmpty();
-		if (!appendCoverage)
+		sectionController.reset(plan);
+		rateTargets.assign(plan.rateSetpoints.size(), 0);
+		lastRateSent.assign(plan.rateSetpoints.size(), 0);
+		rateControlEngaged = false;
+		sectionCentresValid = false;
+
+		if (plan.supports_section_control())
 		{
-			const QVariantMap last = currentWorkedPoints.constLast().toMap();
-			appendCoverage = std::hypot(currentImplementX - last.value("x").toDouble(),
-			                                currentImplementZ - last.value("z").toDouble()) >= 0.4;
+			QStringList booms;
+			for (const auto &boom : plan.booms)
+			{
+				booms << QString("element %1 with %2 sections").arg(boom.element).arg(boom.sections.size());
+			}
+			currentSectionControlStatus = QString("Ready: %1 boom(s), %2 sections").arg(plan.booms.size()).arg(plan.section_count());
+			logs.addLine(QString("[tc-sc] Client %1 accepts section control: %2%3.")
+			               .arg(planClient)
+			               .arg(booms.join(", "))
+			               .arg(plan.sectionControlStateElement ? QString(", auto/manual on element %1").arg(*plan.sectionControlStateElement) : QString()));
 		}
-		if (appendCoverage && (currentWorkedPoints.size() < 3000))
+		else
 		{
-			QVariantMap point;
-			point["x"] = currentImplementX;
-			point["z"] = currentImplementZ;
-			point["width"] = activeWidth;
-			point["course"] = currentImplementCourse;
-			currentWorkedPoints.push_back(point);
+			currentSectionControlStatus = (planClient < 0) ? QString("No client") : QString("The client's DDOP offers no section setpoints");
 		}
+		if (!plan.rateSetpoints.empty())
+		{
+			logs.addLine(QString("[rate] Client %1 accepts %2 rate setpoint(s).").arg(planClient).arg(plan.rateSetpoints.size()));
+		}
+		emit sectionControlChanged();
+		sendSetupCommands();
+	}
+
+	void TcBridge::sendSetupCommands()
+	{
+		if ((planClient < 0) || (connectedAddresses.find(static_cast<std::uint8_t>(planClient)) == connectedAddresses.end())) return;
+		const auto &commands = sectionController.plan().setupCommands;
+		if (commands.empty()) return;
+		sendTcCommands(commands);
+		const auto triggers = std::count_if(commands.cbegin(), commands.cend(), [](const TcCommand &command) {
+			return TcCommand::Kind::ChangeThreshold == command.kind;
+		});
+		const bool defaultData = std::any_of(commands.cbegin(), commands.cend(), [](const TcCommand &command) {
+			return command.ddi == static_cast<std::uint16_t>(isobus::DataDescriptionIndex::RequestDefaultProcessData);
+		});
+		logs.addLine(QString("[tc] Set up client %1: %2%3 on-change report(s).")
+		               .arg(planClient)
+		               .arg(defaultData ? "requested its default process data (TC-BAS), " : "")
+		               .arg(triggers));
+	}
+
+	void TcBridge::sendTcCommands(const std::vector<TcCommand> &commands)
+	{
+		if ((nullptr == server) || (planClient < 0) || commands.empty()) return;
+		auto client = server->find_client(static_cast<std::uint8_t>(planClient));
+		if (nullptr == client) return;
+		for (const auto &command : commands)
+		{
+			switch (command.kind)
+			{
+				case TcCommand::Kind::RequestValue:
+					server->send_request_value(client, command.ddi, command.element);
+					break;
+				case TcCommand::Kind::SetValue:
+					// Plain Set Value: not every client accepts Set Value and Acknowledge.
+					server->send_set_value(client, command.ddi, command.element, static_cast<std::uint32_t>(command.value));
+					break;
+				case TcCommand::Kind::TimeInterval:
+					server->send_time_interval_measurement_command(client, command.ddi, command.element, static_cast<std::uint32_t>(command.value));
+					break;
+				case TcCommand::Kind::ChangeThreshold:
+					server->send_change_threshold_measurement_command(client, command.ddi, command.element, static_cast<std::uint32_t>(command.value));
+					break;
+			}
+		}
+	}
+
+	void TcBridge::serviceSectionControl(std::uint64_t nowMs)
+	{
+		const bool connected = (planClient >= 0) && (connectedAddresses.find(static_cast<std::uint8_t>(planClient)) != connectedAddresses.end());
+		const bool engage = running && connected && taskActive && autoSectionControlEnabled && sectionController.plan().supports_section_control();
+		const auto transition = sectionController.set_engaged(engage, nowMs);
+		if (!transition.empty())
+		{
+			sendTcCommands(transition);
+			logs.addLine(engage ? QString("[tc-sc] Section control engaged: client %1 set to automatic.").arg(planClient)
+			                    : QString("[tc-sc] Section control released: sections off, client %1 back to manual.").arg(planClient));
+		}
+		QString status = currentSectionControlStatus;
+		if (sectionController.engaged())
+		{
+			sendTcCommands(sectionController.update(wantedSectionStates(sectionPoses(), nowMs), nowMs));
+			const auto &commanded = sectionController.commanded();
+			status = QString("Automatic: %1 of %2 sections on").arg(std::count(commanded.cbegin(), commanded.cend(), true)).arg(commanded.size());
+		}
+		else if (sectionController.plan().supports_section_control())
+		{
+			status = !autoSectionControlEnabled ? QString("Manual (automatic section control off)")
+			                                     : QString("Ready: starts with the task (%1 sections)").arg(sectionController.plan().section_count());
+		}
+		if (status != currentSectionControlStatus)
+		{
+			currentSectionControlStatus = status;
+			emit sectionControlChanged();
+		}
+	}
+
+	void TcBridge::serviceRateControl(std::uint64_t nowMs)
+	{
+		const auto &plan = sectionController.plan();
+		const bool connected = (planClient >= 0) && (connectedAddresses.find(static_cast<std::uint8_t>(planClient)) != connectedAddresses.end());
+		const bool anyTarget = std::any_of(rateTargets.cbegin(), rateTargets.cend(), [](int target) { return target > 0; });
+		const bool engage = running && connected && taskActive && anyTarget;
+		const auto prescriptionState = static_cast<std::uint16_t>(isobus::DataDescriptionIndex::PrescriptionControlState);
+		if (engage != rateControlEngaged)
+		{
+			rateControlEngaged = engage;
+			std::vector<TcCommand> commands;
+			for (const auto element : plan.prescriptionControlStateElements)
+			{
+				commands.push_back({ TcCommand::Kind::SetValue, prescriptionState, element, engage ? 1 : 0 });
+			}
+			sendTcCommands(commands);
+			lastRateSent.assign(rateTargets.size(), 0);
+			lastRateSentMs = 0;
+			logs.addLine(engage ? QString("[rate] Rate control engaged for client %1.").arg(planClient)
+			                    : QString("[rate] Rate control released for client %1.").arg(planClient));
+		}
+		if (!rateControlEngaged) return;
+		const bool heartbeat = (nowMs - lastRateSentMs) >= 2000;
+		std::vector<TcCommand> commands;
+		for (std::size_t i = 0; (i < plan.rateSetpoints.size()) && (i < rateTargets.size()); ++i)
+		{
+			if ((rateTargets[i] > 0) && (heartbeat || (lastRateSent[i] != rateTargets[i])))
+			{
+				commands.push_back({ TcCommand::Kind::SetValue, plan.rateSetpoints[i].ddi, plan.rateSetpoints[i].element, rateTargets[i] });
+				lastRateSent[i] = rateTargets[i];
+			}
+		}
+		if (!commands.empty())
+		{
+			sendTcCommands(commands);
+			lastRateSentMs = nowMs;
+		}
+	}
+
+	std::array<double, 2> TcBridge::elementOffset(const ImplementElementState &element) const
+	{
+		std::array<double, 2> offset = { 0.0, 0.0 };
+		bool haveX = false;
+		bool haveY = false;
+		const ImplementElementState *current = &element;
+		for (int depth = 0; (depth < 16) && (nullptr != current) && !(haveX && haveY); ++depth)
+		{
+			if (!haveX && current->hasOffsetX)
+			{
+				offset[0] = current->localX;
+				haveX = true;
+			}
+			if (!haveY && current->hasOffsetY)
+			{
+				offset[1] = current->localY;
+				haveY = true;
+			}
+			const ImplementElementState *parent = nullptr;
+			for (const auto &candidate : implementElementStates)
+			{
+				if ((candidate.objectId == current->parentObjectId) && (&candidate != current)) parent = &candidate;
+			}
+			current = parent;
+		}
+		if (!haveY) offset[1] = element.localY; // fallback layout for sections without geometry
+		return offset;
+	}
+
+	std::vector<TcBridge::SectionPose> TcBridge::sectionPoses() const
+	{
+		std::vector<SectionPose> poses;
+		std::array<double, 2> connector = { 0.0, 0.0 };
+		for (const auto &element : implementElementStates)
+		{
+			if (element.type == static_cast<int>(isobus::task_controller_object::DeviceElementObject::Type::Connector))
+			{
+				connector = elementOffset(element);
+				break;
+			}
+		}
+		// The implement's reference point is its hitch, where the connector sits.
+		const double heading = currentImplementCourse * DegreesToRadians;
+		const double forwardX = std::sin(heading);
+		const double forwardZ = -std::cos(heading);
+		const double rightX = std::cos(heading);
+		const double rightZ = std::sin(heading);
+		auto place = [&](double offsetX, double offsetY, double widthM) {
+			const double forward = offsetX - connector[0];
+			const double right = offsetY - connector[1];
+			poses.push_back({ { currentImplementX + (forwardX * forward) + (rightX * right),
+			                    currentImplementZ + (forwardZ * forward) + (rightZ * right) },
+			                  widthM });
+		};
+
+		const auto &plan = sectionController.plan();
+		for (const auto &boom : plan.booms)
+		{
+			for (const auto sectionNumber : boom.sections)
+			{
+				const auto found = std::find_if(implementElementStates.cbegin(), implementElementStates.cend(),
+				                                [sectionNumber](const ImplementElementState &element) { return element.element == sectionNumber; });
+				if (found == implementElementStates.cend())
+				{
+					place(0.0, 0.0, 0.0);
+					continue;
+				}
+				const auto offset = elementOffset(*found);
+				place(offset[0], offset[1], found->width);
+			}
+		}
+		if (poses.empty() && !implementElementStates.empty())
+		{
+			// No sections: the implement works as one, as wide as its widest element.
+			double width = 0.0;
+			for (const auto &element : implementElementStates) width = std::max(width, element.width);
+			place(connector[0], connector[1], std::max(width, 1.0));
+		}
+		return poses;
+	}
+
+	std::vector<bool> TcBridge::appliedSectionStates() const
+	{
+		const auto &plan = sectionController.plan();
+		if (0 == plan.section_count())
+		{
+			return { taskActive }; // the single implement-wide section
+		}
+		const bool reportsActual = std::any_of(plan.booms.cbegin(), plan.booms.cend(),
+		                                       [](const BoomPlan &boom) { return !boom.actualCondensedDdis.empty(); });
+		if (!reportsActual)
+		{
+			return sectionController.engaged() ? sectionController.commanded() : std::vector<bool>(plan.section_count(), false);
+		}
+		std::vector<bool> states;
+		for (const auto &boom : plan.booms)
+		{
+			for (const auto sectionNumber : boom.sections)
+			{
+				const auto found = std::find_if(implementElementStates.cbegin(), implementElementStates.cend(),
+				                                [sectionNumber](const ImplementElementState &element) { return element.element == sectionNumber; });
+				states.push_back((found != implementElementStates.cend()) && found->active);
+			}
+		}
+		return states;
+	}
+
+	std::vector<bool> TcBridge::wantedSectionStates(const std::vector<SectionPose> &poses, std::uint64_t nowMs) const
+	{
+		std::vector<bool> wanted(poses.size(), false);
+		const double speed = currentGps.speedMps.value_or(0.0);
+		if (speed < 0.3) return wanted; // standing still, nothing to apply
+
+		// Look ahead by the time the client needs to switch a section, so it switches on the edge.
+		double lookAheadS = 1.0;
+		for (const auto &state : implementDdiStates)
+		{
+			if ((state.ddi == static_cast<std::uint16_t>(isobus::DataDescriptionIndex::SCTurnOnTime)) && state.hasValue && (state.value > 0))
+			{
+				lookAheadS = std::clamp(static_cast<double>(state.value) / 1000.0, 0.2, 5.0);
+			}
+		}
+		const double heading = currentImplementCourse * DegreesToRadians;
+		const double forwardX = std::sin(heading);
+		const double forwardZ = -std::cos(heading);
+		const double rightX = std::cos(heading);
+		const double rightZ = std::sin(heading);
+		for (std::size_t i = 0; i < poses.size(); ++i)
+		{
+			const GroundPoint ahead = { poses[i].centre.x + (forwardX * speed * lookAheadS), poses[i].centre.z + (forwardZ * speed * lookAheadS) };
+			if (!insideFieldBoundary(ahead)) continue;
+			// Off when most of the section's width ahead was covered before (not by this pass).
+			int covered = 0;
+			for (const double across : { -0.3, 0.0, 0.3 })
+			{
+				const GroundPoint sample = { ahead.x + (rightX * across * poses[i].widthM), ahead.z + (rightZ * across * poses[i].widthM) };
+				if (coverage.is_covered(sample, nowMs, 1500)) ++covered;
+			}
+			wanted[i] = (covered < 2);
+		}
+		return wanted;
+	}
+
+	bool TcBridge::insideFieldBoundary(GroundPoint point) const
+	{
+		if (boundaryLocal.size() < 3) return true; // no field boundary: work everywhere
+		bool inside = false;
+		for (std::size_t i = 0, j = boundaryLocal.size() - 1; i < boundaryLocal.size(); j = i++)
+		{
+			const auto &a = boundaryLocal[i];
+			const auto &b = boundaryLocal[j];
+			if (((a.z > point.z) != (b.z > point.z)) &&
+			    (point.x < ((b.x - a.x) * (point.z - a.z) / (b.z - a.z)) + a.x))
+			{
+				inside = !inside;
+			}
+		}
+		return inside;
+	}
+
+	void TcBridge::extendCoveragePatch(std::size_t section, GroundPoint from, GroundPoint to, double widthM)
+	{
+		static constexpr std::size_t MAX_PATCHES = 30000;
+		if (section >= openPatchBySection.size()) openPatchBySection.resize(section + 1, -1);
+		const double courseDeg = std::atan2(to.x - from.x, -(to.z - from.z)) / DegreesToRadians;
+		int &open = openPatchBySection[section];
+		if (open >= 0)
+		{
+			auto &patch = coveragePatchList[static_cast<std::size_t>(open)];
+			const double length = std::hypot(patch.end.x - patch.start.x, patch.end.z - patch.start.z);
+			const double turn = std::remainder(courseDeg - patch.courseDeg, 360.0);
+			// Keep one patch per straight stretch; start a new one on a turn or width change.
+			if ((std::abs(turn) < 3.0) && (length < 25.0) && (std::abs(patch.widthM - widthM) < 0.01))
+			{
+				patch.end = to;
+				return;
+			}
+		}
+		if (coveragePatchList.size() >= MAX_PATCHES)
+		{
+			open = -1;
+			return;
+		}
+		coveragePatchList.push_back({ from, to, widthM, courseDeg });
+		open = static_cast<int>(coveragePatchList.size()) - 1;
+	}
+
+	void TcBridge::publishCoverage(bool force)
+	{
+		const auto nowMs = steady_clock_ms();
+		if (!force && ((nowMs - lastCoveragePublishMs) < 250)) return;
+		lastCoveragePublishMs = nowMs;
+		QVariantList patches;
+		patches.reserve(static_cast<qsizetype>(coveragePatchList.size()));
+		for (const auto &patch : coveragePatchList)
+		{
+			const double dx = patch.end.x - patch.start.x;
+			const double dz = patch.end.z - patch.start.z;
+			const double length = std::hypot(dx, dz);
+			QVariantMap row;
+			row["x"] = (patch.start.x + patch.end.x) / 2.0;
+			row["z"] = (patch.start.z + patch.end.z) / 2.0;
+			row["length"] = length;
+			row["width"] = patch.widthM;
+			row["course"] = (length > 0.01) ? (std::atan2(dx, -dz) / DegreesToRadians) : patch.courseDeg;
+			patches.push_back(row);
+		}
+		currentCoveragePatches = patches;
 		emit workChanged();
+	}
+
+	QVariantList TcBridge::coveragePatches() const
+	{
+		return currentCoveragePatches;
+	}
+
+	bool TcBridge::autoSectionControl() const
+	{
+		return autoSectionControlEnabled;
+	}
+
+	QString TcBridge::sectionControlStatus() const
+	{
+		return currentSectionControlStatus;
+	}
+
+	QVariantList TcBridge::rateSetpoints() const
+	{
+		QVariantList rows;
+		const auto &plan = sectionController.plan();
+		for (std::size_t i = 0; i < plan.rateSetpoints.size(); ++i)
+		{
+			QVariantMap row;
+			row["ddi"] = plan.rateSetpoints[i].ddi;
+			row["element"] = plan.rateSetpoints[i].element;
+			row["name"] = QString::fromStdString(plan.rateSetpoints[i].name).trimmed();
+			row["target"] = (i < rateTargets.size()) ? rateTargets[i] : 0;
+			rows.push_back(row);
+		}
+		return rows;
+	}
+
+	void TcBridge::setAutoSectionControl(bool enabled)
+	{
+		if (autoSectionControlEnabled == enabled) return;
+		autoSectionControlEnabled = enabled;
+		logs.addLine(QString("[tc-sc] Automatic section control %1.").arg(enabled ? "on" : "off"));
+		emit sectionControlChanged();
+		serviceSectionControl(steady_clock_ms());
+	}
+
+	void TcBridge::setRateTarget(int index, int value)
+	{
+		if ((index < 0) || (index >= static_cast<int>(rateTargets.size()))) return;
+		rateTargets[static_cast<std::size_t>(index)] = std::max(0, value);
+		emit sectionControlChanged();
 	}
 
 	void TcBridge::updateSpeedMessages(double elapsedSeconds)

@@ -143,39 +143,23 @@ Item {
                 }
             }
 
-            // Worked swaths (decimated for speed)
-            var worked = bridge.workedPoints;
-            if (worked && worked.length > 0) {
-                var stride = Math.max(1, Math.ceil(worked.length / 900));
+            // TC coverage: the ground each section applied, one patch per straight stretch
+            var patches = bridge.coveragePatches;
+            if (patches && patches.length > 0) {
                 ctx.fillStyle = "rgba(53, 199, 89, 0.55)";
-                for (var k = 0; k < worked.length; k += stride) {
-                    var wp = worked[k];
-                    var wx = root.toScreenX(wp.x), wy = root.toScreenZ(wp.z);
-                    if (wx < -20 || wy < -20 || wx > w + 20 || wy > h + 20) continue;
+                for (var k = 0; k < patches.length; ++k) {
+                    var cp = patches[k];
+                    var px = root.toScreenX(cp.x), py = root.toScreenZ(cp.z);
+                    var reach = (Math.max(cp.length, cp.width) / 2) * root.scale + 20;
+                    if (px < -reach || py < -reach || px > w + reach || py > h + reach) continue;
                     ctx.save();
-                    ctx.translate(wx, wy);
-                    ctx.rotate((wp.course || 0) * Math.PI / 180);
-                    var sw = Math.max(1.5, (wp.width || 3) * root.scale);
-                    ctx.fillRect(-sw / 2, -0.4 * root.scale, sw, 0.8 * root.scale);
+                    ctx.translate(px, py);
+                    ctx.rotate((cp.course || 0) * Math.PI / 180);
+                    var pw = Math.max(1, cp.width * root.scale);
+                    var pl = Math.max(1, cp.length * root.scale);
+                    ctx.fillRect(-pw / 2, -pl / 2, pw, pl);
                     ctx.restore();
                 }
-            }
-
-            // Track history polyline (decimated)
-            var track = bridge.trackPoints;
-            if (track && track.length > 1) {
-                var tstride = Math.max(1, Math.ceil(track.length / 700));
-                ctx.beginPath();
-                var started = false;
-                for (var t = 0; t < track.length; t += tstride) {
-                    var tp = track[t];
-                    var tx = root.toScreenX(tp.x), ty = root.toScreenZ(tp.z);
-                    if (!started) { ctx.moveTo(tx, ty); started = true; }
-                    else { ctx.lineTo(tx, ty); }
-                }
-                ctx.strokeStyle = "rgba(115, 199, 255, 0.8)";
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
             }
 
             // Trailed implement (rectangle, heading of implement)

@@ -1,5 +1,8 @@
 #include "TcServerCore.hpp"
 
+#include "TcClientPlan.hpp"
+
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 
@@ -49,10 +52,10 @@ namespace agisotc
 		record.snapshot.identityNumber = clientControlFunction->get_NAME().get_identity_number();
 		record.snapshot.lastSeenMs = steady_clock_ms();
 		record.snapshot.timedOut = false;
+		record.snapshot.ddopSizeBytes = static_cast<std::uint32_t>(record.storedPool.size());
 		auto activeClient = get_active_client(clientControlFunction);
 		if (nullptr != activeClient)
 		{
-			record.snapshot.ddopSizeBytes = activeClient->clientDDOPsize_bytes;
 			record.snapshot.ddopActive = activeClient->isDDOPActive;
 			record.snapshot.reportedVersion = activeClient->reportedVersion;
 			record.snapshot.statusBits = activeClient->statusBitfield;
@@ -65,6 +68,19 @@ namespace agisotc
 		pendingLogs.emplace_back(line);
 	}
 
+	std::shared_ptr<isobus::task_controller_object::DeviceObject> GuiTaskControllerServer::stored_device_object(const std::vector<std::uint8_t> &pool, std::uint8_t clientVersion)
+	{
+		if (pool.empty()) return nullptr;
+		isobus::DeviceDescriptorObjectPool parsed;
+		if (0 == parse_client_pool(pool, clientVersion, parsed)) return nullptr;
+		for (std::uint16_t i = 0; i < parsed.size(); ++i)
+		{
+			auto device = std::dynamic_pointer_cast<isobus::task_controller_object::DeviceObject>(parsed.get_object_by_index(i));
+			if (nullptr != device) return device;
+		}
+		return nullptr;
+	}
+
 	bool GuiTaskControllerServer::activate_object_pool(std::shared_ptr<isobus::ControlFunction> clientControlFunction,
 	                                                   ObjectPoolActivationError &activationError,
 	                                                   ObjectPoolErrorCodes &objectPoolError,
@@ -73,13 +89,22 @@ namespace agisotc
 	{
 		std::lock_guard<std::mutex> lock(mutex);
 		auto &record = touch_locked(clientControlFunction);
+		const bool uploaded = record.uploadOpen;
+		const auto transfers = record.transfersInUpload;
+		record.uploadOpen = false;
+		record.transfersInUpload = 0;
 		record.snapshot.ddopActive = true;
+		record.snapshot.ddopSizeBytes = static_cast<std::uint32_t>(record.storedPool.size());
 		rosterDirty = true;
 		activationError = ObjectPoolActivationError::NoErrors;
 		objectPoolError = ObjectPoolErrorCodes::NoErrors;
 		parentObjectIDOfFaultyObject = 0xFFFF;
 		faultyObjectID = 0xFFFF;
-		log_locked("DDOP activated by client at address " + std::to_string(record.snapshot.address));
+		// The pool is only whole once the client activates it, so the GUI parses it now.
+		pendingPoolsChanged.push_back(record.snapshot.address);
+		log_locked("DDOP activated by client at address " + std::to_string(record.snapshot.address) + ": " +
+		           std::to_string(record.storedPool.size()) + " bytes" +
+		           (uploaded ? " in " + std::to_string(transfers) + " transfer(s)" : " (stored copy)"));
 		return true;
 	}
 
@@ -100,7 +125,7 @@ namespace agisotc
 		std::lock_guard<std::mutex> lock(mutex);
 		auto &record = touch_locked(clientControlFunction);
 		record.snapshot.ddopActive = false;
-		record.poolComplete = false; // Next upload starts a fresh reassembly, kept bytes stay viewable.
+		record.uploadOpen = false; // A later transfer starts a new pool; the kept bytes stay viewable.
 		rosterDirty = true;
 		log_locked("DDOP deactivated by client at address " + std::to_string(record.snapshot.address));
 		return true;
@@ -112,7 +137,7 @@ namespace agisotc
 		std::lock_guard<std::mutex> lock(mutex);
 		auto &record = touch_locked(clientControlFunction);
 		record.storedPool.clear();
-		record.poolComplete = false;
+		record.uploadOpen = false;
 		record.snapshot.ddopActive = false;
 		rosterDirty = true;
 		returnedErrorCode = ObjectPoolDeletionErrors::ErrorDetailsNotAvailable;
@@ -122,25 +147,52 @@ namespace agisotc
 	}
 
 	bool GuiTaskControllerServer::get_is_stored_device_descriptor_object_pool_by_structure_label(std::shared_ptr<isobus::ControlFunction> clientControlFunction,
-	                                                                                             const std::vector<std::uint8_t> &,
-	                                                                                             const std::vector<std::uint8_t> &)
+	                                                                                             const std::vector<std::uint8_t> &structureLabel,
+	                                                                                             const std::vector<std::uint8_t> &extendedStructureLabel)
 	{
 		std::lock_guard<std::mutex> lock(mutex);
 		auto &record = touch_locked(clientControlFunction);
-		// TODO: match the requested structure label against the stored pool instead of
-		// reporting any stored pool. v1 keeps an in-memory NVM per client.
-		const bool stored = !record.storedPool.empty();
+		bool stored = false;
+		if (const auto device = stored_device_object(record.storedPool, record.snapshot.reportedVersion))
+		{
+			const std::string label = device->get_structure_label();
+			const bool askingForStoredLabel = std::all_of(structureLabel.begin(), structureLabel.end(),
+			                                              [](std::uint8_t byte) { return 0xFF == byte; });
+			if (askingForStoredLabel)
+			{
+				// ISO 11783-10: the request carries no label, and the TC answers with the label of
+				// the pool it stores, which the client compares with its own. The stack sends back
+				// the vectors it passed in, which are its own non-const locals, so they are filled
+				// with the stored labels here.
+				auto &reply = const_cast<std::vector<std::uint8_t> &>(structureLabel);
+				reply.assign(label.begin(), label.end());
+				const auto extended = device->get_extended_structure_label();
+				if (!extended.empty())
+				{
+					const_cast<std::vector<std::uint8_t> &>(extendedStructureLabel) = extended;
+				}
+				stored = true;
+			}
+			else
+			{
+				// A client that sends its label is told "stored" only for that same pool: any
+				// other stored pool is stale, and activating it would use the wrong objects.
+				stored = std::equal(structureLabel.begin(), structureLabel.end(), label.begin(), label.end()) &&
+				  (extendedStructureLabel.empty() || (extendedStructureLabel == device->get_extended_structure_label()));
+			}
+		}
 		log_locked("Client at address " + std::to_string(record.snapshot.address) +
 		           " asked for DDOP by structure label; stored=" + (stored ? "yes" : "no"));
 		return stored;
 	}
 
 	bool GuiTaskControllerServer::get_is_stored_device_descriptor_object_pool_by_localization_label(std::shared_ptr<isobus::ControlFunction> clientControlFunction,
-	                                                                                                const std::array<std::uint8_t, 7> &)
+	                                                                                                const std::array<std::uint8_t, 7> &localizationLabel)
 	{
 		std::lock_guard<std::mutex> lock(mutex);
 		auto &record = touch_locked(clientControlFunction);
-		const bool stored = !record.storedPool.empty();
+		const auto device = stored_device_object(record.storedPool, record.snapshot.reportedVersion);
+		const bool stored = (nullptr != device) && (device->get_localization_label() == localizationLabel);
 		log_locked("Client at address " + std::to_string(record.snapshot.address) +
 		           " asked for DDOP by localization label; stored=" + (stored ? "yes" : "no"));
 		return stored;
@@ -170,7 +222,7 @@ namespace agisotc
 		auto &record = touch_locked(clientControlFunction);
 		record.snapshot.ddopActive = false;
 		record.snapshot.timedOut = true;
-		record.poolComplete = false;
+		record.uploadOpen = false;
 		rosterDirty = true;
 		log_locked("Client at address " + std::to_string(record.snapshot.address) + " timed out");
 	}
@@ -233,42 +285,26 @@ namespace agisotc
 		std::lock_guard<std::mutex> lock(mutex);
 		auto &record = touch_locked(clientControlFunction);
 
-		// The stack reports append=false for every segment (its segment counter
-		// is never incremented), so large pools would arrive here as a series
-		// of overwriting chunks. Reassemble multi-segment uploads ourselves
-		// using the total size the client announced in RequestObjectPoolTransfer.
-		auto activeClient = get_active_client(clientControlFunction);
-		const std::uint32_t expectedBytes = (nullptr != activeClient) ? activeClient->clientDDOPsize_bytes : 0;
-		if (expectedBytes > 0)
+		// A client may send its pool in several object pool transfers, each after a request of
+		// its own that announces only that transfer's size (e.g. the device object first, then
+		// the process data, then the elements). All of them make up one pool until the client
+		// activates it, so they are appended; the first transfer after an activation,
+		// deactivation, deletion or timeout starts a new pool. The stack's append flag cannot
+		// tell these apart, as it reports false for every transfer.
+		(void)appendToPool;
+		if (!record.uploadOpen)
 		{
-			const bool startOver = record.poolComplete ||
-				(record.storedPool.size() + objectPoolData.size() > expectedBytes);
-			if (startOver)
-			{
-				record.storedPool.clear();
-				record.poolComplete = false;
-			}
-			record.storedPool.insert(record.storedPool.end(), objectPoolData.begin(), objectPoolData.end());
-			record.poolComplete = (record.storedPool.size() >= expectedBytes);
+			record.storedPool.clear();
+			record.uploadOpen = true;
+			record.transfersInUpload = 0;
 		}
-		else
-		{
-			if (!appendToPool)
-			{
-				record.storedPool.clear();
-			}
-			record.storedPool.insert(record.storedPool.end(), objectPoolData.begin(), objectPoolData.end());
-			record.poolComplete = true;
-		}
-
-		if (record.poolComplete)
-		{
-			pendingPoolsChanged.push_back(record.snapshot.address);
-		}
-		log_locked("DDOP segment (" + std::to_string(objectPoolData.size()) + " bytes) from client at address " +
-		           std::to_string(record.snapshot.address) + ", accumulated " +
-		           std::to_string(record.storedPool.size()) + " of " + std::to_string(expectedBytes) +
-		           (record.poolComplete ? " (complete)" : " (waiting for more)"));
+		record.storedPool.insert(record.storedPool.end(), objectPoolData.begin(), objectPoolData.end());
+		++record.transfersInUpload;
+		record.snapshot.ddopSizeBytes = static_cast<std::uint32_t>(record.storedPool.size());
+		rosterDirty = true;
+		log_locked("DDOP transfer " + std::to_string(record.transfersInUpload) + " (" + std::to_string(objectPoolData.size()) +
+		           " bytes) from client at address " + std::to_string(record.snapshot.address) + ", " +
+		           std::to_string(record.storedPool.size()) + " bytes so far");
 		return true;
 	}
 
@@ -325,11 +361,21 @@ namespace agisotc
 			if (entry.second.snapshot.address == address)
 			{
 				entry.second.storedPool.clear();
-				entry.second.poolComplete = false;
+				entry.second.uploadOpen = false;
 				pendingPoolsChanged.push_back(address);
 				log_locked("Stored DDOP copy discarded for client at address " + std::to_string(address));
 			}
 		}
+	}
+
+	std::uint8_t GuiTaskControllerServer::client_version(std::uint8_t address)
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		for (auto &entry : records)
+		{
+			if (entry.second.snapshot.address == address) return entry.second.snapshot.reportedVersion;
+		}
+		return 0;
 	}
 
 	std::shared_ptr<isobus::ControlFunction> GuiTaskControllerServer::find_client(std::uint8_t address)

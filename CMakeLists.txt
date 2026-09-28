@@ -34,11 +34,15 @@ add_library(tcserver_core STATIC
   src/core/FieldTaskManager.cpp
   src/core/NmeaParser.cpp
   src/core/IsoGpsHandler.cpp
-  src/core/FieldTracker.cpp)
+  src/core/FieldTracker.cpp
+  src/core/TcClientPlan.cpp
+  src/core/SectionController.cpp
+  src/core/CoverageMap.cpp)
 if("WindowsCANAPI2" IN_LIST CAN_DRIVER)
   target_sources(tcserver_core PRIVATE src/core/PcanVirtualNetwork.cpp)
 endif()
 target_include_directories(tcserver_core PUBLIC src/core)
+target_compile_features(tcserver_core PUBLIC cxx_std_17)
 target_link_libraries(tcserver_core
   PUBLIC
     isobus::Isobus
@@ -50,6 +54,9 @@ if(AGISOTC_BUILD_TESTS)
   add_executable(tcserver_core_tests tests/core_workflow_tests.cpp)
   target_link_libraries(tcserver_core_tests PRIVATE tcserver_core)
   add_test(NAME core_workflow COMMAND tcserver_core_tests)
+  add_executable(tc_plan_tests tests/tc_plan_tests.cpp)
+  target_link_libraries(tc_plan_tests PRIVATE tcserver_core)
+  add_test(NAME tc_plan COMMAND tc_plan_tests)
 endif()
 
 if(AGISOTC_BUILD_GUI)

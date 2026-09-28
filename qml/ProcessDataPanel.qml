@@ -70,10 +70,52 @@ GroupBox {
                     Item { Layout.fillWidth: true }
                     Button { text: "Clear coverage"; onClicked: bridge.clearWorkedArea() }
                 }
+                RowLayout {
+                    Layout.fillWidth: true
+                    CheckBox {
+                        text: "Automatic section control"
+                        checked: bridge.autoSectionControl
+                        onToggled: bridge.setAutoSectionControl(checked)
+                        ToolTip.visible: hovered
+                        ToolTip.text: "While a task is active, the TC switches the client to automatic and turns its sections on and off from the field boundary and the coverage."
+                    }
+                    Label {
+                        text: bridge.sectionControlStatus
+                        color: bridge.sectionControlStatus.startsWith("Automatic") ? "#8fe388" : "#9fb0c3"
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
+                    }
+                }
                 Label {
-                    text: bridge.activeSectionCount + " of " + bridge.sectionCount + " sections ON"
+                    text: bridge.activeSectionCount + " of " + bridge.sectionCount + " sections ON (as the client reports)"
                     color: bridge.activeSectionCount > 0 ? "#f2d33c" : "#8995a3"
                     font.bold: true
+                }
+                Label {
+                    visible: bridge.rateSetpoints.length === 0
+                    text: "Rate control: the client's DDOP offers no rate setpoints."
+                    color: "#8995a3"
+                    font.pixelSize: 12
+                }
+                Repeater {
+                    model: bridge.rateSetpoints
+                    delegate: RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            text: "Rate " + (modelData.name !== "" ? modelData.name : "setpoint") + " (DDI " + modelData.ddi + ", element " + modelData.element + ")"
+                            color: "#dfe6ee"
+                            Layout.fillWidth: true
+                        }
+                        SpinBox {
+                            from: 0
+                            to: 2000000000
+                            editable: true
+                            value: modelData.target
+                            onValueModified: bridge.setRateTarget(index, value)
+                            ToolTip.visible: hovered
+                            ToolTip.text: "Rate the TC commands while a task is active, in the DDOP's raw unit. 0 sends nothing."
+                        }
+                    }
                 }
                 Flow {
                     Layout.fillWidth: true

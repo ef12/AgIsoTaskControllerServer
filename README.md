@@ -18,7 +18,15 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
 - Commands: request value, set value (± acknowledge), measurement triggers
   (time/distance interval, min/max/change thresholds)
 - Task start/stop (task-totals-active status bit)
-- 3D section-control view: section boxes light up from a configurable section-state DDI
+- TC-BAS: requests the client's default process data when its pool is active and
+  at every task start
+- TC-SC: switches the client to automatic section control while a task is active
+  and turns each section on and off from the field boundary and the coverage,
+  per boom (Setpoint Condensed Work State)
+- Rate control: commands the client's settable rate setpoints while a task is active
+- Coverage map: the ground each section applied, as the client reports it, in the
+  3D view and the field map
+- 3D section-control view: section boxes light up from the client's work states
 - Event log console, TC identify banner
 - CAN drivers: WCAN shared-memory bus (Windows, cross-process), PCAN-USB
   (Windows), PEAK PCAN Virtual via CAN-API 2 (Windows, cross-process),
@@ -26,11 +34,43 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
 
 ## Protocol notes
 
-- A client's DDOP tree is shown once the client **stores its pool to NVM**
-  (the transfer itself is not retained by the server by design). You can also
-  load any DDOP binary (`.bin`/`.iop`) manually per client for visualization.
-- TODO: match structure/localization labels against stored pools; forward the
-  CAN stack logger into the GUI log; persistent settings.
+- **DDOP transfer.** A client may send its pool in several object pool transfers,
+  each after a request of its own (for example the device object, then the
+  process data, then the elements). They are joined into one pool, which is
+  parsed once the client activates it. It is parsed with the DDOP layout of the
+  TC version the client reported (version 4 adds the extended structure label).
+  You can also load any DDOP binary (`.bin`/`.iop`) manually per client.
+- **Stored pools** are kept in memory for as long as the server runs. A client
+  that asks for the structure label of the stored pool gets it and can activate
+  without uploading again; a client that sends its own label is told "stored"
+  only when the labels match.
+- **TC-BAS.** When a pool is activated, and again at every task start (a client
+  may drop its measurements when the task stops), the server requests the
+  client's default process data (DDI 0xDFFF) and asks for a report on every
+  change of the work states and the section control state.
+- **TC-SC.** While a task is active and **Automatic section control** (TC-SC tab)
+  is on, the server sets the client's Section Control State to automatic and
+  sends a Setpoint Condensed Work State per boom: on changes, and every second.
+  A section is on when the machine moves, the point it reaches after the
+  client's SC turn-on time (1 s if unknown) lies inside the selected field, and
+  that ground was not covered before. Stopping the task, switching automatic
+  section control off or stopping the server turns all sections off and sets
+  the client back to manual. Set values are sent without acknowledge, which not
+  every client accepts.
+- **Rate control.** Settable rate setpoints in the DDOP (volume, mass or count per
+  area, spacing, ...) are listed in the TC-SC tab. A target other than 0 is sent
+  while a task is active, after setting the Prescription Control State to
+  automatic where the client has one.
+- **Coverage** follows the section states the client reports (Actual Condensed
+  Work State), or the commanded ones for a client that reports none. Worked area
+  counts covered ground once, however often it is driven over.
+- **Geometry.** Element offsets are taken from the device reference point
+  (ISO 11783-10), X forward and Y to the right; an element without an offset of
+  its own sits where the element above it does. Offsets and widths may come as
+  properties or as process data values, which the server requests.
+- **Capacity.** The server logs when a client reports more booms, sections or
+  channels than the TC offers, since a client then holds back what exceeds it.
+- TODO: forward the CAN stack logger into the GUI log; persistent settings.
 
 ## Build
 
@@ -97,8 +137,26 @@ the GUI (`-DAGISOTC_BUILD_GUI=OFF` skips the Qt requirement).
    network is registered persistently at 250 kbit/s, so the applications can be
    started in any order. The `virtual` driver is useful only for participants in
    the same process. On Linux, use `socketcan` plus an interface such as `can0`.
-2. Set TC number, booms, sections, channels; press **Start server**.
+2. Set TC number, booms, sections, channels; press **Start server**. Offer at
+   least what the client reports (see the event log), e.g. 64 sections.
 3. Select a client, inspect its DDOP, watch live values, send commands.
+4. For section control: start GPS, create or select a field, create and start a
+   task, and drive. The TC-SC tab shows the section states and the worked area.
+
+### Command-line options
+
+The options preset the top bar, so the server can be started from a script:
+
+| Option | Meaning |
+|---|---|
+| `--driver NAME` | `wcan`, `pcan_usb`, `pcan_virtual`, `virtual` or `socketcan` |
+| `--channel NAME` | Bus name, CAN-API 2 network name, or SocketCAN interface |
+| `--tc-number N` | TC number, 1..32 |
+| `--booms N`, `--sections N`, `--channels N` | What the TC reports it supports |
+| `--autostart` | Start the server at once with these settings |
+
+For example:
+`AgIsoTaskControllerServer --driver pcan_virtual --channel PCANLight_USB --sections 64 --autostart`
 
 ## License
 

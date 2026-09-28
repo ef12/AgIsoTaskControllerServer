@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "isobus/isobus/isobus_device_descriptor_object_pool.hpp"
 #include "isobus/isobus/isobus_task_controller_server.hpp"
 
 namespace agisotc
@@ -36,7 +37,7 @@ namespace agisotc
 		std::uint8_t functionInstance = 0;
 		std::uint16_t manufacturerCode = 0;
 		std::uint32_t identityNumber = 0;
-		std::uint32_t ddopSizeBytes = 0;
+		std::uint32_t ddopSizeBytes = 0; ///< Size of the stored pool, all of its transfers together.
 		bool ddopActive = false;
 		bool timedOut = false;
 		std::uint8_t reportedVersion = 0;
@@ -143,17 +144,26 @@ namespace agisotc
 		/// @brief Finds a client's control function by source address for commanding.
 		std::shared_ptr<isobus::ControlFunction> find_client(std::uint8_t address);
 
+		/// @brief TC version a client reported in its technical capabilities, 0 if unknown.
+		std::uint8_t client_version(std::uint8_t address);
+
 	private:
 		struct ClientRecord
 		{
 			std::shared_ptr<isobus::ControlFunction> controlFunction;
 			ClientSnapshot snapshot;
 			std::vector<std::uint8_t> storedPool;
-			bool poolComplete = false; ///< True once a full multi-segment upload was reassembled.
+			/// True while a client is transferring its pool. A pool may arrive in several object
+			/// pool transfers, each after its own request, and they all belong to one pool until
+			/// the client activates it.
+			bool uploadOpen = false;
+			std::uint16_t transfersInUpload = 0;
 		};
 
 		ClientRecord &touch_locked(std::shared_ptr<isobus::ControlFunction> clientControlFunction);
 		void log_locked(const std::string &line);
+		/// @brief Parses a stored pool with the client's TC version and returns its device object, or nullptr.
+		static std::shared_ptr<isobus::task_controller_object::DeviceObject> stored_device_object(const std::vector<std::uint8_t> &pool, std::uint8_t clientVersion);
 
 		std::mutex mutex;
 		std::map<std::uintptr_t, ClientRecord> records; ///< Keyed by control function pointer.
