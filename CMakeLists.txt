@@ -166,8 +166,7 @@ if(WIN32 AND AGISOTC_BUILD_GUI)
       COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/Main.qml
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/TopBar.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/ClientsPanel.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/DdopPanel.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/ClientPanel.qml
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/ProcessDataPanel.qml
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/ProcessDataWindow.qml
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/SectionView3D.qml

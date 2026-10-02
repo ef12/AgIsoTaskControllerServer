@@ -2,8 +2,7 @@
   <qresource prefix="/">
     <file>qml/Main.qml</file>
     <file>qml/TopBar.qml</file>
-    <file>qml/ClientsPanel.qml</file>
-    <file>qml/DdopPanel.qml</file>
+    <file>qml/ClientPanel.qml</file>
     <file>qml/ProcessDataPanel.qml</file>
     <file>qml/ProcessDataWindow.qml</file>
     <file>qml/SectionView3D.qml</file>

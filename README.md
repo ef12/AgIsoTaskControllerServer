@@ -12,8 +12,10 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
 
 ## Features (v1 — monitor + control core)
 
-- Client roster: source address, NAME, DDOP size, active/timeout state, TC version, status bits
-- DDOP inspector: parsed device/element/process-data/property tree per client
+- TC clients and DDOP panel: the client roster (source address, NAME, DDOP size,
+  active/timeout state, TC version, status bits) on top, the devices heard on the bus
+  folded into one line, and below them the selected client's DDOP: its parsed
+  device/element/process-data/property tree, its declared DDIs and the pool actions
 - Live process-data table with per-(client, DDI, element) tracking
 - Task start/stop (task-totals-active status bit)
 - TC-BAS: requests the client's default process data when its pool is active and

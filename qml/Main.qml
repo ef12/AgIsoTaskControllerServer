@@ -95,6 +95,7 @@ ApplicationWindow {
 
             ColumnLayout {
                 Layout.preferredWidth: 420
+                Layout.maximumWidth: 450
                 Layout.fillHeight: true
                 spacing: 8
                 OperationsPanel {
@@ -105,11 +106,8 @@ ApplicationWindow {
                         mapWindow.requestActivate()
                     }
                 }
-                ClientsPanel {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 230
-                }
-                DdopPanel {
+                // The clients and the selected client's DDOP, in one panel.
+                ClientPanel {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                 }
