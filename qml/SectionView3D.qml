@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick3D
+import AgIsoTc 1.0
 
 GroupBox {
     id: root
@@ -15,6 +16,30 @@ GroupBox {
     property bool followTractor: true
     property real lastMouseX: 0
     property real lastMouseY: 0
+
+    // Metres the tractor and the implement drove, which turn their wheels. A step longer than
+    // a few metres between two updates is a jump of the position (a new field, the GPS
+    // restarted), not driving, and is left out.
+    property real tractorTravel: 0
+    property real implementTravel: 0
+    property real lastTractorX: NaN
+    property real lastTractorZ: NaN
+    property real lastImplementX: NaN
+    property real lastImplementZ: NaN
+    readonly property real maxTravelStepM: 5
+
+    function addTravel() {
+        const tractorStep = Math.hypot(bridge.tractorX - lastTractorX, bridge.tractorZ - lastTractorZ)
+        if (isFinite(tractorStep) && tractorStep < maxTravelStepM)
+            tractorTravel += tractorStep
+        const implementStep = Math.hypot(bridge.implementX - lastImplementX, bridge.implementZ - lastImplementZ)
+        if (isFinite(implementStep) && implementStep < maxTravelStepM)
+            implementTravel += implementStep
+        lastTractorX = bridge.tractorX
+        lastTractorZ = bridge.tractorZ
+        lastImplementX = bridge.implementX
+        lastImplementZ = bridge.implementZ
+    }
 
     function focusTractor() {
         targetX = bridge.tractorX
@@ -32,6 +57,7 @@ GroupBox {
     Connections {
         target: bridge
         function onGpsChanged() {
+            root.addTravel()
             if (root.followTractor)
                 root.focusTractor()
         }
@@ -97,6 +123,22 @@ GroupBox {
                     }
                 }
 
+                // Ground grid over the ground and the field: a fine line every 10 m and a
+                // stronger one every 50 m, on the world origin, so the field's edges lie on it.
+                Repeater3D {
+                    model: [{ spacing: 10, colour: "#34424f", lift: -0.03 },
+                            { spacing: 50, colour: "#5b6f84", lift: -0.025 }]
+                    delegate: Model {
+                        required property var modelData
+                        y: modelData.lift
+                        geometry: GridGeometry { spacing: modelData.spacing; extent: 1000 }
+                        materials: PrincipledMaterial {
+                            lighting: PrincipledMaterial.NoLighting
+                            baseColor: modelData.colour
+                        }
+                    }
+                }
+
 
                 Node {
                     Repeater3D {
@@ -126,76 +168,28 @@ GroupBox {
                     }
                 }
 
+                // The tractor at its reference point, heading the GPS course; its wheels turn with
+                // the distance it drives, the front ones also with the steering.
                 Node {
-                    position: Qt.vector3d(bridge.tractorX, 1.2, bridge.tractorZ)
+                    position: Qt.vector3d(bridge.tractorX, 0, bridge.tractorZ)
                     eulerRotation.y: -bridge.gpsCourse
-
-                    // Tractor dimensions are represented in metres. Front is local -Z.
-                    Model {
-                        source: "#Cube"
-                        position: Qt.vector3d(0, 0.45, -0.55)
-                        scale: Qt.vector3d(0.028, 0.011, 0.026)
-                        materials: PrincipledMaterial { baseColor: "#237a34"; metalness: 0.15; roughness: 0.45 }
+                    TractorModel {
+                        travel: root.tractorTravel
+                        steering: bridge.steeringAngle
                     }
-                    Model {
-                        source: "#Cube"
-                        position: Qt.vector3d(0, 1.15, -1.75)
-                        scale: Qt.vector3d(0.019, 0.011, 0.032)
-                        materials: PrincipledMaterial { baseColor: "#2f9d45"; metalness: 0.18; roughness: 0.38 }
-                    }
-                    Model {
-                        source: "#Cube"
-                        position: Qt.vector3d(0, 1.55, 0.9)
-                        scale: Qt.vector3d(0.022, 0.018, 0.021)
-                        materials: PrincipledMaterial { baseColor: "#151a20"; metalness: 0.25; roughness: 0.25 }
-                    }
-                    Model {
-                        source: "#Cube"
-                        position: Qt.vector3d(0, 1.56, 0.9)
-                        scale: Qt.vector3d(0.018, 0.015, 0.017)
-                        materials: PrincipledMaterial { baseColor: "#8dd9ff"; metalness: 0.05; roughness: 0.12; opacity: 0.78 }
-                    }
-                    Model {
-                        source: "#Cube"
-                        position: Qt.vector3d(0, 0.5, -3.25)
-                        scale: Qt.vector3d(0.016, 0.007, 0.022)
-                        materials: PrincipledMaterial { baseColor: "#e6d74a"; roughness: 0.35 }
-                    }
-                    Model {
-                        source: "#Cube"
-                        position: Qt.vector3d(0, 0.55, 2.55)
-                        scale: Qt.vector3d(0.034, 0.006, 0.012)
-                        materials: PrincipledMaterial { baseColor: "#3b424b"; roughness: 0.65 }
-                    }
-                    Node {
-                        position: Qt.vector3d(-1.45, 0, -1.95)
-                        eulerRotation.y: -bridge.steeringAngle
-                        Model { source: "#Cylinder"; eulerRotation.z: 90; scale: Qt.vector3d(0.013, 0.006, 0.013); materials: PrincipledMaterial { baseColor: "#111417"; roughness: 0.9 } }
-                        Model { source: "#Cylinder"; eulerRotation.z: 90; scale: Qt.vector3d(0.008, 0.0065, 0.008); materials: PrincipledMaterial { baseColor: "#2f9d45"; metalness: 0.25; roughness: 0.45 } }
-                    }
-                    Node {
-                        position: Qt.vector3d(1.45, 0, -1.95)
-                        eulerRotation.y: -bridge.steeringAngle
-                        Model { source: "#Cylinder"; eulerRotation.z: 90; scale: Qt.vector3d(0.013, 0.006, 0.013); materials: PrincipledMaterial { baseColor: "#111417"; roughness: 0.9 } }
-                        Model { source: "#Cylinder"; eulerRotation.z: 90; scale: Qt.vector3d(0.008, 0.0065, 0.008); materials: PrincipledMaterial { baseColor: "#2f9d45"; metalness: 0.25; roughness: 0.45 } }
-                    }
-                    Model { source: "#Cylinder"; position: Qt.vector3d(-1.65, 0, 1.65); eulerRotation.z: 90; scale: Qt.vector3d(0.022, 0.009, 0.022); materials: PrincipledMaterial { baseColor: "#111417"; roughness: 0.9 } }
-                    Model { source: "#Cylinder"; position: Qt.vector3d( 1.65, 0, 1.65); eulerRotation.z: 90; scale: Qt.vector3d(0.022, 0.009, 0.022); materials: PrincipledMaterial { baseColor: "#111417"; roughness: 0.9 } }
-                    Model { source: "#Cylinder"; position: Qt.vector3d(-1.65, 0, 1.65); eulerRotation.z: 90; scale: Qt.vector3d(0.013, 0.0095, 0.013); materials: PrincipledMaterial { baseColor: "#f0c33c"; metalness: 0.35; roughness: 0.4 } }
-                    Model { source: "#Cylinder"; position: Qt.vector3d( 1.65, 0, 1.65); eulerRotation.z: 90; scale: Qt.vector3d(0.013, 0.0095, 0.013); materials: PrincipledMaterial { baseColor: "#f0c33c"; metalness: 0.35; roughness: 0.4 } }
                 }
 
                 // The implement pivots around the tractor hitch and follows with its own heading.
                 Node {
                         position: Qt.vector3d(bridge.implementX, 0.8, bridge.implementZ)
                         eulerRotation.y: -bridge.implementCourse
-                        // The connector, and the booms that carry sections with their sections. Once
-                        // the booms are known they are drawn as LED bars below, so only the
-                        // connector (type 6) stays from this list.
+                        // The connector, and the booms that carry sections with their sections:
+                        // drawn only until the booms are known. Then the trailer below carries the
+                        // booms, drawn as LED bars.
                         Repeater3D {
                             model: bridge.implementElementModel
                             delegate: Model {
-                                visible: model.type === 6 || bridge.boomLedModel.count === 0
+                                visible: bridge.boomLedModel.count === 0
                                 source: model.type === 6 ? "#Cylinder" : "#Cube"
                                 position: Qt.vector3d(model.x,
                                                       Math.max(0.08, model.y + model.height / 2),
@@ -213,6 +207,14 @@ GroupBox {
                                     roughness: 0.55
                                 }
                             }
+                        }
+
+                        // The trailer the booms ride on, from the hitch, with wheels on the ground
+                        // (the implement's frame is 0.8 m up).
+                        ImplementTrailer {
+                            y: -0.8
+                            booms: bridge.booms
+                            travel: root.implementTravel
                         }
 
                         // Each boom as an LED bar trailing the tractor: a dark rail as wide as

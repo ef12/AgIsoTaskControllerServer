@@ -1321,6 +1321,7 @@ namespace agisotc
 			row["left"] = left;
 			row["right"] = right;
 			row["widthM"] = right - left;
+			row["z"] = barZ;
 			row["sections"] = sectionRows;
 			boomRows.push_back(row);
 		}

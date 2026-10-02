@@ -12,6 +12,10 @@
     <file>qml/FieldMapView.qml</file>
     <file>qml/SectionStatusPanel.qml</file>
     <file>qml/BoomLedBars.qml</file>
+    <file>qml/Part3D.qml</file>
+    <file>qml/WheelModel.qml</file>
+    <file>qml/TractorModel.qml</file>
+    <file>qml/ImplementTrailer.qml</file>
     <file alias="icons/logo.ico">doc/logo.ico</file>
   </qresource>
 </RCC>

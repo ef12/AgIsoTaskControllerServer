@@ -27,6 +27,11 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
 - 3D section-control view: each boom is an LED bar trailing the tractor, one LED per
   section, as wide as the section, lit while the section is on (from the client's work
   states). Booms that would lie on top of each other are drawn one behind the other.
+  The booms ride on a trailer (tongue from the hitch, frame, transport and gauge
+  wheels) behind a large orange cab tractor; all wheels turn with the distance driven
+  and the front wheels steer. A ground grid marks every 10 m and 50 m. The vehicles
+  are built from Qt Quick 3D primitives (`qml/TractorModel.qml`,
+  `qml/ImplementTrailer.qml`, `qml/WheelModel.qml`), so no model files are needed.
 - Section LED bars (TC-SC tab and the map window): one bar per boom, drawn to scale
   and where the boom is across the implement, so a 31-row seeding boom shows 31
   narrow LEDs and a 2-section fertilizer boom 2 wide ones

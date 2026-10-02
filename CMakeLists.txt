@@ -69,6 +69,7 @@ if(AGISOTC_BUILD_GUI)
     src/gui/main.cpp
     src/gui/TcBridge.cpp
     src/gui/TcModels.cpp
+    src/gui/GridGeometry.cpp
     resources.qrc)
 
   if(WIN32)
@@ -175,6 +176,10 @@ if(WIN32 AND AGISOTC_BUILD_GUI)
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/FieldMapView.qml
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/SectionStatusPanel.qml
         ${CMAKE_CURRENT_SOURCE_DIR}/qml/BoomLedBars.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/Part3D.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/WheelModel.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/TractorModel.qml
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml/ImplementTrailer.qml
         ${CMAKE_CURRENT_BINARY_DIR}/stage
       COMMENT "Running windeployqt, staging Qt deps, and copying QML files"
       VERBATIM)

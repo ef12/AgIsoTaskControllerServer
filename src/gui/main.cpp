@@ -10,7 +10,9 @@
 #include <QQmlContext>
 #include <QUrl>
 #include <QVariantMap>
+#include <QtQml/qqml.h>
 
+#include "GridGeometry.hpp"
 #include "TcBridge.hpp"
 
 namespace
@@ -55,6 +57,7 @@ int main(int argc, char *argv[])
 	const QVariantMap startupOptions = parse_startup_options(app);
 
 	agisotc::TcBridge bridge;
+	qmlRegisterType<agisotc::GridGeometry>("AgIsoTc", 1, 0, "GridGeometry");
 
 	QQmlApplicationEngine engine;
 	engine.rootContext()->setContextProperty("startupOptions", startupOptions);

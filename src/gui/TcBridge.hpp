@@ -68,8 +68,8 @@ namespace agisotc
 		Q_PROPERTY(VariantListModel *implementElementModel READ implementElementModel CONSTANT)
 		/// The booms that carry sections, each with its sections' place, width and state: the LED
 		/// bars of the TC-SC views. Rows: index, element, name, count, onCount, left, right, widthM
-		/// (metres across the implement, right of the connector), and sections (number, element,
-		/// name, left, width, on).
+		/// (metres across the implement, right of the connector), z (metres behind the connector,
+		/// where the 3D view draws the bar), and sections (number, element, name, left, width, on).
 		Q_PROPERTY(QVariantList booms READ booms NOTIFY implementChanged)
 		/// The same as one LED per row, plus one "rail" row per boom, for the 3D view: kind, boom,
 		/// number, x (right), z (rearward of the connector), width, on. Updated in place.
