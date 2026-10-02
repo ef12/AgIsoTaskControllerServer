@@ -66,6 +66,14 @@ namespace agisotc
 		Q_PROPERTY(QVariantList coveragePatches READ coveragePatches NOTIFY workChanged)
 		Q_PROPERTY(VariantListModel *coveragePatchModel READ coveragePatchModel CONSTANT)
 		Q_PROPERTY(VariantListModel *implementElementModel READ implementElementModel CONSTANT)
+		/// The booms that carry sections, each with its sections' place, width and state: the LED
+		/// bars of the TC-SC views. Rows: index, element, name, count, onCount, left, right, widthM
+		/// (metres across the implement, right of the connector), and sections (number, element,
+		/// name, left, width, on).
+		Q_PROPERTY(QVariantList booms READ booms NOTIFY implementChanged)
+		/// The same as one LED per row, plus one "rail" row per boom, for the 3D view: kind, boom,
+		/// number, x (right), z (rearward of the connector), width, on. Updated in place.
+		Q_PROPERTY(VariantListModel *boomLedModel READ boomLedModel CONSTANT)
 		Q_PROPERTY(bool autoSectionControl READ autoSectionControl NOTIFY sectionControlChanged)
 		Q_PROPERTY(QString sectionControlStatus READ sectionControlStatus NOTIFY sectionControlChanged)
 		Q_PROPERTY(QVariantList rateSetpoints READ rateSetpoints NOTIFY sectionControlChanged)
@@ -101,22 +109,10 @@ namespace agisotc
 		Q_PROPERTY(DdopModel *ddopModel READ ddopModel CONSTANT)
 		Q_PROPERTY(ProcessDataModel *valueModel READ valueModel CONSTANT)
 		Q_PROPERTY(DdiTrafficModel *ddiTrafficModel READ ddiTrafficModel CONSTANT)
-	Q_PROPERTY(BusMonitorModel *busMonitorModel READ busMonitorModel CONSTANT)
 	Q_PROPERTY(QVariantList busPeers READ busPeers NOTIFY busPeersChanged)
 		Q_PROPERTY(LogModel *logModel READ logModel CONSTANT)
 
 	public:
-		/// Measurement trigger kinds, matching the TC process data command bytes.
-		enum class MeasurementKind : int
-		{
-			TimeInterval = 4,
-			DistanceInterval = 5,
-			MinimumThreshold = 6,
-			MaximumThreshold = 7,
-			ChangeThreshold = 8
-		};
-		Q_ENUM(MeasurementKind)
-
 		explicit TcBridge(QObject *parent = nullptr);
 		~TcBridge() override;
 
@@ -141,6 +137,7 @@ namespace agisotc
 		QVariantList coveragePatches() const;
 		VariantListModel *coveragePatchModel();
 		VariantListModel *implementElementModel();
+		VariantListModel *boomLedModel();
 		bool autoSectionControl() const;
 		QString sectionControlStatus() const;
 		QVariantList rateSetpoints() const;
@@ -158,6 +155,7 @@ namespace agisotc
 		QString implementName() const;
 		QString implementGeometryStatus() const;
 		QVariantList implementElements() const;
+		QVariantList booms() const;
 		QVariantList implementDdis() const;
 		bool autoDdiSync() const;
 		int ddiSyncIntervalMs() const;
@@ -176,7 +174,6 @@ namespace agisotc
 		DdopModel *ddopModel();
 		ProcessDataModel *valueModel();
 		DdiTrafficModel *ddiTrafficModel();
-	BusMonitorModel *busMonitorModel();
 	QVariantList busPeers() const;
 		LogModel *logModel();
 
@@ -185,9 +182,6 @@ namespace agisotc
 		Q_INVOKABLE void poll();
 		Q_INVOKABLE void selectClient(int address);
 		Q_INVOKABLE void setTaskActive(bool active);
-		Q_INVOKABLE void requestValue(int ddi, int element);
-		Q_INVOKABLE void setValue(int ddi, int element, int value, bool acknowledge);
-		Q_INVOKABLE void sendMeasurement(int kind, int ddi, int element, int value);
 		Q_INVOKABLE void setSectionDdi(int ddi);
 		Q_INVOKABLE void setSectionCount(int count);
 		Q_INVOKABLE void loadPoolFile(const QUrl &fileUrl);
@@ -210,7 +204,6 @@ namespace agisotc
 		Q_INVOKABLE void setDdiSyncIntervalMs(int intervalMs);
 	Q_INVOKABLE void setLiveDdiTrafficWatch(bool enabled);
 	Q_INVOKABLE void clearDdiTraffic();
-	Q_INVOKABLE void clearBusMonitor();
 		Q_INVOKABLE void requestImplementDdis();
 		Q_INVOKABLE bool startBoundaryRecording(const QString &name);
 		Q_INVOKABLE bool finishBoundaryRecording();
@@ -268,6 +261,8 @@ namespace agisotc
 		void clearImplementModel();
 		void buildImplementModel(isobus::DeviceDescriptorObjectPool &pool);
 		void publishImplementModel();
+		/// @brief Rebuilds the booms and the LED bar rows from the plan and the section states.
+		void publishBoomLeds(const std::array<double, 2> &connectorOffset);
 		void updateImplementValue(std::uint16_t ddi, std::uint16_t element, std::int32_t value);
 		void serviceDdiSync();
 		void appendDdiTraffic(const QString &direction, const QString &command, int address, int ddi, int element,
@@ -333,7 +328,6 @@ namespace agisotc
 		DdopModel ddop;
 		ProcessDataModel values;
 		DdiTrafficModel ddiTraffic;
-		BusMonitorModel busMonitor;
 		LogModel logs;
 
 		struct BusPeerInfo
@@ -486,6 +480,9 @@ namespace agisotc
 			                                                "width", "length", "height", "active", "hasGeometry" } };
 		bool implementModelDirty = false;
 		std::uint64_t lastImplementPublishMs = 0;
+		QVariantList currentBooms;
+		VariantListModel boomLedRows{ QStringList{ "kind", "boom", "number", "x", "z", "width", "on" } };
+		std::vector<bool> publishedLedStates; ///< Section states the LED bars show, in plan order.
 		std::vector<GroundPoint> boundaryLocal; ///< Selected field's boundary in local metres.
 	};
 } // namespace agisotc

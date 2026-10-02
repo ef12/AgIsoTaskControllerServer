@@ -6,13 +6,12 @@
     <file>qml/DdopPanel.qml</file>
     <file>qml/ProcessDataPanel.qml</file>
     <file>qml/ProcessDataWindow.qml</file>
-    <file>qml/CommandPanel.qml</file>
     <file>qml/SectionView3D.qml</file>
     <file>qml/OperationsPanel.qml</file>
     <file>qml/MapWindow.qml</file>
     <file>qml/FieldMapView.qml</file>
     <file>qml/SectionStatusPanel.qml</file>
-    <file>qml/LogPanel.qml</file>
+    <file>qml/BoomLedBars.qml</file>
     <file alias="icons/logo.ico">doc/logo.ico</file>
   </qresource>
 </RCC>

@@ -189,10 +189,13 @@ GroupBox {
                 Node {
                         position: Qt.vector3d(bridge.implementX, 0.8, bridge.implementZ)
                         eulerRotation.y: -bridge.implementCourse
-                        // The connector and the booms that carry sections, with their sections.
+                        // The connector, and the booms that carry sections with their sections. Once
+                        // the booms are known they are drawn as LED bars below, so only the
+                        // connector (type 6) stays from this list.
                         Repeater3D {
                             model: bridge.implementElementModel
                             delegate: Model {
+                                visible: model.type === 6 || bridge.boomLedModel.count === 0
                                 source: model.type === 6 ? "#Cylinder" : "#Cube"
                                 position: Qt.vector3d(model.x,
                                                       Math.max(0.08, model.y + model.height / 2),
@@ -208,6 +211,29 @@ GroupBox {
                                     emissiveFactor: model.active ? Qt.vector3d(0.25, 0.20, 0.02) : Qt.vector3d(0, 0, 0)
                                     metalness: 0.25
                                     roughness: 0.55
+                                }
+                            }
+                        }
+
+                        // Each boom as an LED bar trailing the tractor: a dark rail as wide as
+                        // the boom, and on it one LED per section, as wide as the section, lit
+                        // green while the section is on. Booms that would lie on top of each
+                        // other are drawn one behind the other.
+                        Repeater3D {
+                            model: bridge.boomLedModel
+                            delegate: Model {
+                                readonly property bool rail: model.kind === "rail"
+                                source: "#Cube"
+                                position: Qt.vector3d(model.x, rail ? 0.16 : 0.40, model.z)
+                                scale: Qt.vector3d(Math.max(0.002, model.width / 100),
+                                                   rail ? 0.0024 : 0.0022,
+                                                   rail ? 0.0085 : 0.0060)
+                                materials: PrincipledMaterial {
+                                    baseColor: rail ? "#2c333b" : (model.on ? "#3ddc6e" : "#1b2128")
+                                    emissiveFactor: (!rail && model.on) ? Qt.vector3d(0.18, 0.85, 0.36)
+                                                                         : Qt.vector3d(0, 0, 0)
+                                    metalness: rail ? 0.4 : 0.05
+                                    roughness: rail ? 0.6 : 0.3
                                 }
                             }
                         }

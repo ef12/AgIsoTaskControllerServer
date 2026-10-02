@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <map>
 
 #include <QDateTime>
@@ -28,32 +29,12 @@ namespace agisotc
 	{
 		constexpr double EarthRadiusM = 6371000.0;
 		constexpr double DegreesToRadians = 3.14159265358979323846 / 180.0;
-
-		QString pgnName(std::uint32_t pgn)
-		{
-			switch (pgn)
-			{
-				case 0xEE00: return "AddrClaim";
-				case 0xEA00: return "Request";
-				case 0xEC00: return "TP.CM";
-				case 0xEB00: return "TP.DT";
-				case 0xC800: return "ETP.CM";
-				case 0xC700: return "ETP.DT";
-				case 0xCB00: return "ProcData";
-			case 0xFE0D: return "WorkSetMaster";
-				case 0xF022: return "MSSpeed";
-				case 0xFD43: return "MSSpdCmd";
-				case 0xFE48: return "WhlSpd";
-				case 0xFE49: return "GndSpd";
-				case 129025: return "GPS.Pos";
-				case 129026: return "GPS.COG/SOG";
-				case 129027: return "GPS.dPos";
-				case 129029: return "GPS.GNSS";
-				case 127250: return "VesselHdg";
-				case 127251: return "ROT";
-				default: return {};
-			}
-		}
+		/// Booms whose LED bars lie closer than this fore and aft would hide each other in the views.
+		constexpr double BoomLedOverlapM = 0.6;
+		/// How far behind the one before an LED bar is drawn when its boom would hide it.
+		constexpr double BoomLedSpacingM = 0.9;
+		/// Share of a section's width its LED takes, so neighbouring LEDs stay apart.
+		constexpr double BoomLedFill = 0.88;
 
 		isobus::NMEA2000Messages::GNSSPositionData::GNSSMethod mapFixQualityToGnssMethod(const std::optional<FixQuality> &quality)
 		{
@@ -343,6 +324,7 @@ namespace agisotc
 	QString TcBridge::implementName() const { return currentImplementName; }
 	QString TcBridge::implementGeometryStatus() const { return currentImplementGeometryStatus; }
 	QVariantList TcBridge::implementElements() const { return currentImplementElements; }
+	QVariantList TcBridge::booms() const { return currentBooms; }
 	QVariantList TcBridge::implementDdis() const { return currentImplementDdis; }
 	bool TcBridge::autoDdiSync() const { return autoDdiSyncEnabled; }
 	int TcBridge::ddiSyncIntervalMs() const { return currentDdiSyncIntervalMs; }
@@ -382,16 +364,6 @@ namespace agisotc
 		return &ddiTraffic;
 	}
 
-	BusMonitorModel *TcBridge::busMonitorModel()
-	{
-		return &busMonitor;
-	}
-
-	void TcBridge::clearBusMonitor()
-	{
-		busMonitor.clear();
-	}
-
 	void TcBridge::drainBusFrames()
 	{
 		if (!canBus.is_running())
@@ -400,9 +372,6 @@ namespace agisotc
 		}
 		for (const auto &frame : canBus.take_sniffed_frames())
 		{
-			BusFrameRow row;
-			row.timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
-			row.direction = frame.outgoing ? "TX" : "RX";
 			std::uint32_t pgn = frame.identifier;
 			int source = -1;
 			int destination = 255;
@@ -417,53 +386,23 @@ namespace agisotc
 					destination = static_cast<int>((frame.identifier >> 8) & 0xFF);
 				}
 			}
-			const QString name = pgnName(pgn);
-			row.pgn = name.isEmpty() ? QString("0x%1 (%2)").arg(pgn, 5, 16, QChar('0')).arg(pgn).toUpper()
-			                         : QString("0x%1 (%2) %3").arg(pgn, 5, 16, QChar('0')).arg(pgn).arg(name).toUpper();
-			row.source = source;
-			row.destination = destination;
-			row.length = frame.length;
-			QString hex;
-			hex.reserve(24);
-			for (std::uint8_t i = 0; (i < frame.length) && (i < 8); ++i)
+			if ((0xEE00 == pgn) && (frame.length >= 8) && !frame.outgoing && (source >= 0) && (source <= 253))
 			{
-				if (0 != i)
-				{
-					hex += ' ';
-				}
-				hex += QString("%1").arg(frame.data[i], 2, 16, QChar('0')).toUpper();
-			}
-			if ((0xEE00 == pgn) && (frame.length >= 8))
-			{
-				// Decode the claimed NAME so the bus tab shows WHO claimed.
+				// An address claim: who is on the bus, for the clients panel.
 				std::uint64_t rawName = 0;
 				for (std::uint8_t i = 0; i < 8; ++i)
 				{
 					rawName |= static_cast<std::uint64_t>(frame.data[i]) << (8 * i);
 				}
 				const isobus::NAME claimed(rawName);
-				hex += QString(" [func=%1 inst=%2 mfr=%3]")
-				         .arg(claimed.get_function_code())
-				         .arg(claimed.get_function_instance())
-				         .arg(claimed.get_manufacturer_code());
-				if (!frame.outgoing && (source >= 0) && (source <= 253))
-				{
-					BusPeerInfo info;
-					info.functionCode = claimed.get_function_code();
-					info.functionInstance = claimed.get_function_instance();
-					info.manufacturerCode = claimed.get_manufacturer_code();
-					info.lastSeenMs = steady_clock_ms();
-					busPeersByAddress[static_cast<std::uint8_t>(source)] = info;
-					refreshBusPeers();
-				}
+				BusPeerInfo info;
+				info.functionCode = claimed.get_function_code();
+				info.functionInstance = claimed.get_function_instance();
+				info.manufacturerCode = claimed.get_manufacturer_code();
+				info.lastSeenMs = steady_clock_ms();
+				busPeersByAddress[static_cast<std::uint8_t>(source)] = info;
+				refreshBusPeers();
 			}
-			if (!frame.outgoing && (0xCB00 == pgn) && (source >= 0) &&
-			    (connectedAddresses.find(static_cast<std::uint8_t>(source)) == connectedAddresses.end()))
-			{
-				hex += " [sender has no active DDOP with us - process data will be NACKed]";
-			}
-			row.data = hex;
-			busMonitor.addRow(row);
 			if ((0xCB00 == pgn) && (8 == frame.length) && (frame.identifier > 0x7FF))
 			{
 				const auto ourControl = canBus.internal_control_function();
@@ -847,6 +786,11 @@ namespace agisotc
 
 	void TcBridge::publishImplementModelIfDue(std::uint64_t nowMs)
 	{
+		// Commanded section states change without a value from the client: the LED bars follow them too.
+		if (!implementModelDirty && (sectionController.plan().section_count() > 0) && (appliedSectionStates() != publishedLedStates))
+		{
+			implementModelDirty = true;
+		}
 		if (implementModelDirty && ((nowMs - lastImplementPublishMs) >= IMPLEMENT_PUBLISH_MS))
 		{
 			publishImplementModel();
@@ -998,6 +942,8 @@ namespace agisotc
 		currentImplementElements.clear();
 		currentImplementDdis.clear();
 		currentTcBasicData.clear();
+		currentBooms.clear();
+		boomLedRows.clear();
 		nextDdiSyncIndex = 0;
 		lastDdiSyncMs = 0;
 		emit implementChanged();
@@ -1178,6 +1124,7 @@ namespace agisotc
 		}
 		currentImplementElements = elements;
 		implementElementRows.setRows(elements);
+		publishBoomLeds(connectorOffset);
 		implementModelDirty = false;
 		lastImplementPublishMs = steady_clock_ms();
 
@@ -1222,6 +1169,163 @@ namespace agisotc
 		}
 		emit implementChanged();
 		emit implementDdisChanged();
+	}
+
+	void TcBridge::publishBoomLeds(const std::array<double, 2> &connectorOffset)
+	{
+		using Type = isobus::task_controller_object::DeviceElementObject::Type;
+		const auto byElement = [this](std::uint16_t number) -> const ImplementElementState * {
+			const auto found = std::find_if(implementElementStates.cbegin(), implementElementStates.cend(),
+			                                [number](const ImplementElementState &element) { return element.element == number; });
+			return (found == implementElementStates.cend()) ? nullptr : &*found;
+		};
+
+		// The booms with their sections: as the TC plan has them (condensed work state order, the
+		// states as the client reports them or else as commanded), or, before there is a plan, the
+		// sections grouped under the element they hang from, with the states they report.
+		struct BoomLeds
+		{
+			const ImplementElementState *boom = nullptr;
+			std::vector<const ImplementElementState *> sections;
+			std::vector<bool> on;
+		};
+		std::vector<BoomLeds> booms;
+		const auto &plan = sectionController.plan();
+		publishedLedStates.clear();
+		if (plan.section_count() > 0)
+		{
+			publishedLedStates = appliedSectionStates();
+			std::size_t flat = 0;
+			for (const auto &boomPlan : plan.booms)
+			{
+				BoomLeds boom;
+				boom.boom = byElement(boomPlan.element);
+				for (const auto number : boomPlan.sections)
+				{
+					const bool on = (flat < publishedLedStates.size()) && publishedLedStates[flat];
+					++flat;
+					const auto *section = byElement(number);
+					if (nullptr == section) continue;
+					boom.sections.push_back(section);
+					boom.on.push_back(on);
+				}
+				if (!boom.sections.empty()) booms.push_back(boom);
+			}
+		}
+		else
+		{
+			std::map<std::uint16_t, BoomLeds> byParent;
+			for (const auto &element : implementElementStates)
+			{
+				if (element.type == static_cast<int>(Type::Section)) byParent[element.parentObjectId].sections.push_back(&element);
+			}
+			for (auto &[parent, boom] : byParent)
+			{
+				for (const auto &candidate : implementElementStates)
+				{
+					if (candidate.objectId == parent) boom.boom = &candidate;
+				}
+				std::sort(boom.sections.begin(), boom.sections.end(), [](const auto *left, const auto *right) { return left->element < right->element; });
+				for (const auto *section : boom.sections) boom.on.push_back(section->active);
+				booms.push_back(boom);
+			}
+		}
+
+		// One LED per section, as wide as the section and where it is across the implement, on a
+		// bar as wide as the boom; the 3D view draws the bars where the booms trail the hitch.
+		QVariantList boomRows;
+		QVariantList ledRows;
+		std::vector<double> barDepths;
+		for (std::size_t index = 0; index < booms.size(); ++index)
+		{
+			const auto &boom = booms[index];
+			struct Led
+			{
+				double x = 0.0;
+				double z = 0.0;
+				double width = 0.0;
+			};
+			std::vector<Led> leds;
+			double left = std::numeric_limits<double>::max();
+			double right = std::numeric_limits<double>::lowest();
+			double depthSum = 0.0;
+			for (const auto *section : boom.sections)
+			{
+				const auto offset = elementOffset(*section);
+				Led led;
+				led.x = offset[1] - connectorOffset[1];
+				led.z = -(offset[0] - connectorOffset[0]);
+				led.width = std::max(section->width, 0.05);
+				left = std::min(left, led.x - (led.width / 2.0));
+				right = std::max(right, led.x + (led.width / 2.0));
+				depthSum += led.z;
+				leds.push_back(led);
+			}
+			double barZ = depthSum / static_cast<double>(leds.size());
+			for (bool moved = true; moved;)
+			{
+				moved = false;
+				for (const double other : barDepths)
+				{
+					if (std::abs(other - barZ) < BoomLedOverlapM)
+					{
+						barZ = other + BoomLedSpacingM;
+						moved = true;
+					}
+				}
+			}
+			barDepths.push_back(barZ);
+
+			const QString name = ((nullptr != boom.boom) && !boom.boom->name.isEmpty()) ? boom.boom->name : QString("Boom %1").arg(index + 1);
+			QVariantMap rail;
+			rail["kind"] = QString("rail");
+			rail["boom"] = static_cast<int>(index);
+			rail["number"] = 0;
+			rail["x"] = (left + right) / 2.0;
+			rail["z"] = barZ;
+			rail["width"] = right - left;
+			rail["on"] = false;
+			ledRows.push_back(rail);
+
+			QVariantList sectionRows;
+			int onCount = 0;
+			for (std::size_t s = 0; s < leds.size(); ++s)
+			{
+				const bool on = boom.on[s];
+				onCount += on ? 1 : 0;
+				QVariantMap led;
+				led["kind"] = QString("led");
+				led["boom"] = static_cast<int>(index);
+				led["number"] = static_cast<int>(s + 1);
+				led["x"] = leds[s].x;
+				led["z"] = barZ;
+				led["width"] = leds[s].width * BoomLedFill;
+				led["on"] = on;
+				ledRows.push_back(led);
+
+				QVariantMap section;
+				section["number"] = static_cast<int>(s + 1);
+				section["element"] = boom.sections[s]->element;
+				section["name"] = boom.sections[s]->name;
+				section["left"] = leds[s].x - (leds[s].width / 2.0);
+				section["width"] = leds[s].width;
+				section["on"] = on;
+				sectionRows.push_back(section);
+			}
+			QVariantMap row;
+			row["index"] = static_cast<int>(index);
+			row["element"] = (nullptr != boom.boom) ? boom.boom->element : 0;
+			row["name"] = name;
+			row["count"] = static_cast<int>(leds.size());
+			row["onCount"] = onCount;
+			row["left"] = left;
+			row["right"] = right;
+			row["widthM"] = right - left;
+			row["sections"] = sectionRows;
+			boomRows.push_back(row);
+		}
+		currentBooms = boomRows;
+		boomLedRows.setRows(ledRows);
 	}
 
 	void TcBridge::updateImplementValue(std::uint16_t ddi, std::uint16_t element, std::int32_t value)
@@ -1422,83 +1526,6 @@ namespace agisotc
 		{
 			stopSelectedTask();
 		}
-	}
-
-	void TcBridge::requestValue(int ddi, int element)
-	{
-		if (!running || (nullptr == server))
-		{
-			setStatus("Start the server first.");
-			return;
-		}
-		auto client = server->find_client(static_cast<std::uint8_t>(currentSelectedClient));
-		if (nullptr == client)
-		{
-			setStatus("Select a client first.");
-			return;
-		}
-		const bool sent = server->send_request_value(client, static_cast<std::uint16_t>(ddi), static_cast<std::uint16_t>(element));
-		logs.addLine(QString("[cmd] Request value DDI %1 element %2 -> %3.").arg(ddi).arg(element).arg(sent ? "sent" : "FAILED"));
-	}
-
-	void TcBridge::setValue(int ddi, int element, int value, bool acknowledge)
-	{
-		if (!running || (nullptr == server))
-		{
-			setStatus("Start the server first.");
-			return;
-		}
-		auto client = server->find_client(static_cast<std::uint8_t>(currentSelectedClient));
-		if (nullptr == client)
-		{
-			setStatus("Select a client first.");
-			return;
-		}
-		const bool sent = acknowledge ? server->send_set_value_and_acknowledge(client, static_cast<std::uint16_t>(ddi), static_cast<std::uint16_t>(element), static_cast<std::uint32_t>(value))
-		                              : server->send_set_value(client, static_cast<std::uint16_t>(ddi), static_cast<std::uint16_t>(element), static_cast<std::uint32_t>(value));
-		logs.addLine(QString("[cmd] Set value DDI %1 element %2 = %3%4 -> %5.").arg(ddi).arg(element).arg(value).arg(acknowledge ? " (ack)" : "").arg(sent ? "sent" : "FAILED"));
-	}
-
-	void TcBridge::sendMeasurement(int kind, int ddi, int element, int value)
-	{
-		if (!running || (nullptr == server))
-		{
-			setStatus("Start the server first.");
-			return;
-		}
-		auto client = server->find_client(static_cast<std::uint8_t>(currentSelectedClient));
-		if (nullptr == client)
-		{
-			setStatus("Select a client first.");
-			return;
-		}
-		const auto dataDescriptionIndex = static_cast<std::uint16_t>(ddi);
-		const auto elementNumber = static_cast<std::uint16_t>(element);
-		const auto commandValue = static_cast<std::uint32_t>(value);
-		bool sent = false;
-		using ProcessDataCommand = isobus::TaskControllerServer::ProcessDataCommands;
-		switch (static_cast<ProcessDataCommand>(kind))
-		{
-			case ProcessDataCommand::MeasurementTimeInterval:
-				sent = server->send_time_interval_measurement_command(client, dataDescriptionIndex, elementNumber, commandValue);
-				break;
-			case ProcessDataCommand::MeasurementDistanceInterval:
-				sent = server->send_distance_interval_measurement_command(client, dataDescriptionIndex, elementNumber, commandValue);
-				break;
-			case ProcessDataCommand::MeasurementMinimumWithinThreshold:
-				sent = server->send_minimum_threshold_measurement_command(client, dataDescriptionIndex, elementNumber, commandValue);
-				break;
-			case ProcessDataCommand::MeasurementMaximumWithinThreshold:
-				sent = server->send_maximum_threshold_measurement_command(client, dataDescriptionIndex, elementNumber, commandValue);
-				break;
-			case ProcessDataCommand::MeasurementChangeThreshold:
-				sent = server->send_change_threshold_measurement_command(client, dataDescriptionIndex, elementNumber, commandValue);
-				break;
-			default:
-				setStatus("Unknown measurement command.");
-				return;
-		}
-		logs.addLine(QString("[cmd] Measurement command %1 DDI %2 element %3 = %4 -> %5.").arg(kind).arg(ddi).arg(element).arg(value).arg(sent ? "sent" : "FAILED"));
 	}
 
 	void TcBridge::setSectionDdi(int ddi)
@@ -2668,6 +2695,11 @@ namespace agisotc
 	VariantListModel *TcBridge::implementElementModel()
 	{
 		return &implementElementRows;
+	}
+
+	VariantListModel *TcBridge::boomLedModel()
+	{
+		return &boomLedRows;
 	}
 
 	QVariantList TcBridge::coveragePatches() const

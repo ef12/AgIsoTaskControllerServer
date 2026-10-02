@@ -14,7 +14,7 @@ GroupBox {
             TabButton { text: "TC-SC" }
             TabButton { text: "Raw process data" }
             TabButton { text: "DDI traffic" }
-            TabButton { text: "Bus monitor" }
+            TabButton { text: "Event log" }
         }
         StackLayout {
             Layout.fillWidth: true
@@ -117,7 +117,18 @@ GroupBox {
                         }
                     }
                 }
+                // One LED bar per boom, as wide as the boom, an LED per section.
+                BoomLedBars {
+                    visible: bridge.booms.length > 0
+                    Layout.fillWidth: true
+                }
+                Item {
+                    visible: bridge.booms.length > 0
+                    Layout.fillHeight: true
+                }
+                // Without a client DDOP: the sections of the manual section DDI, one per button.
                 Flow {
+                    visible: bridge.booms.length === 0
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     spacing: 5
@@ -223,53 +234,31 @@ GroupBox {
                     }
                 }
             }
+            // Event log: what the server did and saw, newest at the bottom.
             ColumnLayout {
                 spacing: 4
-                Label {
-                    text: "Every CAN frame on the bus, both directions — anything any device puts there."
-                    color: "#8995a3"
-                    font.pixelSize: 11
-                    wrapMode: Text.Wrap
+                ListView {
+                    id: logList
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    model: logModel
+                    clip: true
+                    onCountChanged: logList.positionViewAtEnd()
+                    delegate: Text {
+                        width: logList.width
+                        color: "#b9c4d2"
+                        font.family: "Consolas, monospace"
+                        font.pixelSize: 11
+                        wrapMode: Text.Wrap
+                        text: logLine
+                    }
                 }
                 RowLayout {
                     Layout.fillWidth: true
                     Item { Layout.fillWidth: true }
                     Button {
                         text: "Clear"
-                        onClicked: bridge.clearBusMonitor()
-                    }
-                }
-                Row {
-                    Layout.fillWidth: true
-                    height: 22
-                    Text { width: 80; text: "Time"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
-                    Text { width: 44; text: "Dir"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
-                    Text { width: 110; text: "PGN"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
-                    Text { width: 54; text: "Src"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
-                    Text { width: 54; text: "Dst"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
-                    Text { width: 54; text: "Len"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
-                    Text { text: "Data"; color: "#7fd0ff"; font.bold: true; font.pixelSize: 12 }
-                }
-                Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: "#3a4048" }
-                ListView {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    model: busMonitorModel
-                    clip: true
-                    delegate: Rectangle {
-                        width: ListView.view ? ListView.view.width : 600
-                        height: 22
-                        color: index % 2 ? "#151a20" : "transparent"
-                        Row {
-                            anchors.fill: parent
-                            Text { width: 80; text: frameTime; color: "#9fb0c3"; font.pixelSize: 12 }
-                            Text { width: 44; text: frameDir; color: frameDir === "TX" ? "#73c7ff" : "#8fe388"; font.bold: frameDir === "TX"; font.pixelSize: 12 }
-                            Text { width: 110; text: framePgn; color: "#73c7ff"; font.pixelSize: 12; elide: Text.ElideRight }
-                            Text { width: 54; text: frameSrc; color: "#dfe6ee"; font.pixelSize: 12 }
-                            Text { width: 54; text: frameDst; color: "#dfe6ee"; font.pixelSize: 12 }
-                            Text { width: 54; text: frameLen; color: "#dfe6ee"; font.pixelSize: 12 }
-                            Text { text: frameData; color: "#8fe388"; font.pixelSize: 12; elide: Text.ElideRight }
-                        }
+                        onClicked: bridge.clearLog()
                     }
                 }
             }

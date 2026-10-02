@@ -2,8 +2,8 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Compact TC-SC section strip: one block per section (green = ON),
-// plus worked totals. Data: bridge.sectionStates (list of bool).
+// Compact TC-SC section strip: one LED bar per boom (BoomLedBars, bridge.booms), or without a
+// client DDOP one block per section (green = ON, bridge.sectionStates), plus worked totals.
 GroupBox {
     title: "Sections"
 
@@ -18,7 +18,15 @@ GroupBox {
             font.pixelSize: 13
         }
 
+        BoomLedBars {
+            visible: bridge.booms.length > 0
+            Layout.fillWidth: true
+            compact: true
+            barHeight: 18
+        }
+
         GridLayout {
+            visible: bridge.booms.length === 0
             Layout.fillWidth: true
             columns: 8
             columnSpacing: 4

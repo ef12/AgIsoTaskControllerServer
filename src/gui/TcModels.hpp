@@ -168,46 +168,6 @@ namespace agisotc
 		static constexpr int MAX_ROWS = 1000;
 	};
 
-	struct BusFrameRow
-	{
-		QString timestamp;
-		QString direction; ///< "TX" (we sent it) or "RX" (received from the bus).
-		QString pgn;
-		int source = -1;
-		int destination = -1;
-		int length = 0;
-		QString data;
-	};
-
-	class BusMonitorModel : public QAbstractListModel
-	{
-		Q_OBJECT
-	public:
-		enum Roles
-		{
-			TimestampRole = Qt::UserRole + 1,
-			DirectionRole,
-			PgnRole,
-			SourceRole,
-			DestinationRole,
-			LengthRole,
-			DataRole
-		};
-
-		explicit BusMonitorModel(QObject *parent = nullptr);
-
-		int rowCount(const QModelIndex &parent = QModelIndex()) const override;
-		QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
-		QHash<int, QByteArray> roleNames() const override;
-
-		void addRow(const BusFrameRow &row);
-		void clear();
-
-	private:
-		QList<BusFrameRow> rows;
-		static constexpr int MAX_ROWS = 500;
-	};
-
 	class LogModel : public QAbstractListModel
 	{
 		Q_OBJECT

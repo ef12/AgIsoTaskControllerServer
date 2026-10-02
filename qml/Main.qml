@@ -78,20 +78,7 @@ ApplicationWindow {
             Layout.fillHeight: true
             spacing: 8
 
-            ColumnLayout {
-                Layout.preferredWidth: 300
-                Layout.fillHeight: true
-                spacing: 8
-                ClientsPanel {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 340
-                }
-                CommandPanel {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                }
-            }
-
+            // The field view takes all the width the side panel leaves.
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -118,13 +105,13 @@ ApplicationWindow {
                         mapWindow.requestActivate()
                     }
                 }
+                ClientsPanel {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 230
+                }
                 DdopPanel {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                }
-                LogPanel {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 190
                 }
             }
         }

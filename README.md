@@ -15,8 +15,6 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
 - Client roster: source address, NAME, DDOP size, active/timeout state, TC version, status bits
 - DDOP inspector: parsed device/element/process-data/property tree per client
 - Live process-data table with per-(client, DDI, element) tracking
-- Commands: request value, set value (± acknowledge), measurement triggers
-  (time/distance interval, min/max/change thresholds)
 - Task start/stop (task-totals-active status bit)
 - TC-BAS: requests the client's default process data when its pool is active and
   at every task start
@@ -26,8 +24,14 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
 - Rate control: commands the client's settable rate setpoints while a task is active
 - Coverage map: the ground each section applied, as the client reports it, in the
   3D view and the field map
-- 3D section-control view: section boxes light up from the client's work states
-- Event log console, TC identify banner
+- 3D section-control view: each boom is an LED bar trailing the tractor, one LED per
+  section, as wide as the section, lit while the section is on (from the client's work
+  states). Booms that would lie on top of each other are drawn one behind the other.
+- Section LED bars (TC-SC tab and the map window): one bar per boom, drawn to scale
+  and where the boom is across the implement, so a 31-row seeding boom shows 31
+  narrow LEDs and a 2-section fertilizer boom 2 wide ones
+- Task Controller data tabs: TC-Basic, TC-SC, raw process data, DDI traffic and the
+  event log; TC identify banner
 - CAN drivers: WCAN shared-memory bus (Windows, cross-process), PCAN-USB
   (Windows), PEAK PCAN Virtual via CAN-API 2 (Windows, cross-process),
   process-local virtual CAN (tests), and SocketCAN (Linux)
@@ -138,8 +142,8 @@ the GUI (`-DAGISOTC_BUILD_GUI=OFF` skips the Qt requirement).
    started in any order. The `virtual` driver is useful only for participants in
    the same process. On Linux, use `socketcan` plus an interface such as `can0`.
 2. Set TC number, booms, sections, channels; press **Start server**. Offer at
-   least what the client reports (see the event log), e.g. 64 sections.
-3. Select a client, inspect its DDOP, watch live values, send commands.
+   least what the client reports (see the Event log tab), e.g. 64 sections.
+3. Select a client, inspect its DDOP and watch live values.
 4. For section control: start GPS, create or select a field, create and start a
    task, and drive. The TC-SC tab shows the section states and the worked area.
 
