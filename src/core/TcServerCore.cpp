@@ -2,6 +2,11 @@
 
 #include "TcClientPlan.hpp"
 
+#include "isobus/isobus/can_general_parameter_group_numbers.hpp"
+#include "isobus/isobus/can_network_manager.hpp"
+#include "isobus/isobus/can_parameter_group_number_request_protocol.hpp"
+#include "isobus/utility/system_timing.hpp"
+
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
@@ -28,6 +33,11 @@ namespace agisotc
 	                       options,
 	                       versionToReport)
 	{
+	}
+
+	GuiTaskControllerServer::~GuiTaskControllerServer()
+	{
+		stop_client_recovery();
 	}
 
 	GuiTaskControllerServer::ClientRecord &GuiTaskControllerServer::touch_locked(std::shared_ptr<isobus::ControlFunction> clientControlFunction)
@@ -376,6 +386,189 @@ namespace agisotc
 			if (entry.second.snapshot.address == address) return entry.second.snapshot.reportedVersion;
 		}
 		return 0;
+	}
+
+	void GuiTaskControllerServer::start_client_recovery()
+	{
+		if (!recoveryStarted)
+		{
+			isobus::CANNetworkManager::CANNetwork.add_any_control_function_parameter_group_number_callback(
+			  static_cast<std::uint32_t>(isobus::CANLibParameterGroupNumber::ProcessData), note_process_data_sender, this);
+			recoveryStarted = true;
+		}
+	}
+
+	void GuiTaskControllerServer::stop_client_recovery()
+	{
+		if (recoveryStarted)
+		{
+			isobus::CANNetworkManager::CANNetwork.remove_any_control_function_parameter_group_number_callback(
+			  static_cast<std::uint32_t>(isobus::CANLibParameterGroupNumber::ProcessData), note_process_data_sender, this);
+			recoveryStarted = false;
+		}
+	}
+
+	void GuiTaskControllerServer::note_process_data_sender(const isobus::CANMessage &message, void *parentPointer)
+	{
+		auto *server = static_cast<GuiTaskControllerServer *>(parentPointer);
+		const auto source = message.get_source_control_function();
+		if ((nullptr == server) || (nullptr == source) || (message.get_destination_control_function() != server->serverControlFunction))
+		{
+			return;
+		}
+		if (0 == message.get_data_length())
+		{
+			return;
+		}
+		const auto command = static_cast<ProcessDataCommands>(message.get_data()[0] & 0x0F);
+		const bool connecting = (ProcessDataCommands::TechnicalCapabilities == command) || (ProcessDataCommands::DeviceDescriptor == command);
+		const bool values = (ProcessDataCommands::Value == command) || (ProcessDataCommands::SetValueAndAcknowledge == command);
+		if (!connecting && !values)
+		{
+			return;
+		}
+		std::lock_guard<std::mutex> lock(server->mutex);
+		auto noted = std::find_if(server->pendingSenders.begin(), server->pendingSenders.end(), [&source](const NotedSender &sender) {
+			return sender.controlFunction == source;
+		});
+		if (noted == server->pendingSenders.end())
+		{
+			server->pendingSenders.push_back({ source });
+			noted = server->pendingSenders.end() - 1;
+		}
+		noted->connecting = noted->connecting || connecting;
+		noted->values = noted->values || values;
+	}
+
+	void GuiTaskControllerServer::note_out_of_step(std::map<std::uintptr_t, OutOfStepSender> &senders,
+	                                               const std::shared_ptr<isobus::ControlFunction> &controlFunction,
+	                                               std::uint64_t nowMs)
+	{
+		auto &sender = senders[reinterpret_cast<std::uintptr_t>(controlFunction.get())];
+		if (nullptr == sender.controlFunction)
+		{
+			sender.controlFunction = controlFunction;
+			sender.firstSeenMs = nowMs;
+		}
+		sender.lastSeenMs = nowMs;
+	}
+
+	void GuiTaskControllerServer::recover_unknown_clients()
+	{
+		std::vector<NotedSender> senders;
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			senders.swap(pendingSenders);
+		}
+		const std::uint64_t nowMs = steady_clock_ms();
+		for (const auto &sender : senders)
+		{
+			const auto key = reinterpret_cast<std::uintptr_t>(sender.controlFunction.get());
+			const auto client = get_active_client(sender.controlFunction);
+			if (sender.connecting)
+			{
+				// It runs the connection procedure, so it uploads its pool if this server has none.
+				poollessSenders.erase(key);
+				if ((key == statusHoldKey) && (nowMs < statusHeldUntilMs))
+				{
+					statusHeldUntilMs = 0;
+					std::lock_guard<std::mutex> lock(mutex);
+					log_locked("Client at address " + std::to_string(static_cast<unsigned>(sender.controlFunction->get_address())) +
+					           " connects again; the TC status message is sent again");
+				}
+				if (nullptr != client)
+				{
+					unknownSenders.erase(key);
+				}
+				else
+				{
+					note_out_of_step(unknownSenders, sender.controlFunction, nowMs);
+				}
+			}
+			else if ((nullptr != client) && client->isDDOPActive)
+			{
+				poollessSenders.erase(key);
+			}
+			else
+			{
+				note_out_of_step(poollessSenders, sender.controlFunction, nowMs);
+			}
+		}
+
+		for (auto it = poollessSenders.begin(); it != poollessSenders.end();)
+		{
+			OutOfStepSender &poolless = it->second;
+			const auto client = get_active_client(poolless.controlFunction);
+			if (((nullptr != client) && client->isDDOPActive) || ((nowMs - poolless.lastSeenMs) > SENDER_SILENT_MS))
+			{
+				it = poollessSenders.erase(it);
+				continue;
+			}
+			const bool holdAllowed = (nowMs >= statusHeldUntilMs) &&
+			  ((0 == lastStatusHoldMs) || ((nowMs - lastStatusHoldMs) >= STATUS_HOLD_REPEAT_MS));
+			if (((nowMs - poolless.firstSeenMs) >= POOLLESS_MS) && holdAllowed)
+			{
+				statusHeldUntilMs = nowMs + STATUS_HOLD_MS;
+				lastStatusHoldMs = nowMs;
+				statusHoldKey = it->first;
+				std::lock_guard<std::mutex> lock(mutex);
+				log_locked("Client at address " + std::to_string(static_cast<unsigned>(poolless.controlFunction->get_address())) +
+				           " sends process values but has no active device descriptor here (it was connected before this server started, or timed out);"
+				           " the TC status message is held back for " +
+				           std::to_string(STATUS_HOLD_MS / 1000) + " s, so that it connects again and uploads it");
+				it = poollessSenders.erase(it);
+				continue;
+			}
+			++it;
+		}
+		if (nowMs < statusHeldUntilMs)
+		{
+			// The stack sends its status when this is 2 s old.
+			lastStatusMessageTimestamp_ms = isobus::SystemTiming::get_timestamp_ms();
+		}
+
+		for (auto it = unknownSenders.begin(); it != unknownSenders.end();)
+		{
+			OutOfStepSender &unknown = it->second;
+			const auto address = static_cast<unsigned>(unknown.controlFunction->get_address());
+			if (nullptr != get_active_client(unknown.controlFunction))
+			{
+				std::lock_guard<std::mutex> lock(mutex);
+				log_locked("Client at address " + std::to_string(address) + " sent its working set master message and is connected again");
+				it = unknownSenders.erase(it);
+				continue;
+			}
+			if ((nowMs - unknown.lastSeenMs) > SENDER_SILENT_MS)
+			{
+				it = unknownSenders.erase(it);
+				continue;
+			}
+			if ((nowMs - unknown.firstSeenMs) >= IMPLICIT_CLIENT_MS)
+			{
+				// It did not answer: take its process data as its working set master message, as the
+				// stack does on that message (a working set of one).
+				activeClients.push_back(std::make_shared<ActiveClient>(unknown.controlFunction));
+				std::lock_guard<std::mutex> lock(mutex);
+				log_locked("Client at address " + std::to_string(address) +
+				           " did not send its working set master message; accepted as a client without it");
+				it = unknownSenders.erase(it);
+				continue;
+			}
+			if ((nowMs - unknown.lastRequestMs) >= WORKING_SET_REQUEST_MS)
+			{
+				const bool first = (0 == unknown.lastRequestMs);
+				isobus::ParameterGroupNumberRequestProtocol::request_parameter_group_number(
+				  static_cast<std::uint32_t>(isobus::CANLibParameterGroupNumber::WorkingSetMaster), serverControlFunction, unknown.controlFunction);
+				unknown.lastRequestMs = nowMs;
+				if (first)
+				{
+					std::lock_guard<std::mutex> lock(mutex);
+					log_locked("Client at address " + std::to_string(address) +
+					           " sends process data but is not known (no working set master message since it reconnected); asked it for that message");
+				}
+			}
+			++it;
+		}
 	}
 
 	std::shared_ptr<isobus::ControlFunction> GuiTaskControllerServer::find_client(std::uint8_t address)

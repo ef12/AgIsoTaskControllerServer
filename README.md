@@ -51,6 +51,13 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
   next TC status message), the connection, the DDOP upload (bytes received) and the
   geometry values. The implement appears once it is complete, and the Event log
   records how long each step took (`[connect] Implement 128 ready in 8.5 s: ...`).
+- Client recovery: a client that connects again without its working set master
+  message (after a change of its DDOP) is asked for it, and accepted without it after
+  3 s. A client that still sends process values for a pool the server lost (the server
+  restarted within the client's 6 s time-out) makes the server hold back its TC status
+  for 7 s, so the client connects again and uploads its DDOP. Both are in the Event log.
+  `AGISOTC_STACK_LOG=debug` writes the CAN stack's log and the server's own lines to the
+  debug output.
 - Section LED bars (the TC-SC tab and the map window): one bar per boom,
   drawn to scale and where the boom is across the implement, so a 31-row seeding boom
   shows 31 narrow LEDs and a 2-section fertilizer boom 2 wide ones

@@ -30,6 +30,7 @@
 #include "GpsProvider.hpp"
 #include "SectionController.hpp"
 #include "SectionPlanner.hpp"
+#include "StackLog.hpp"
 #include "TcClientPlan.hpp"
 #include "TcModels.hpp"
 #include "TcServerCore.hpp"
@@ -286,6 +287,8 @@ namespace agisotc
 		void updateNmea2000Gps();
 		void rebuildFieldBoundaryPoints();
 		void refreshBusPeers();
+		/// @brief Moves the CAN stack's log lines into the event log.
+		void drainStackLog();
 		/// @brief True while the client is connected with an active pool (and the server runs).
 		bool isClientOnline(int address);
 		/// @brief Follows the connecting implements: geometry of the selected client, the progress
@@ -361,6 +364,9 @@ namespace agisotc
 		std::map<std::uint8_t, BusPeerInfo> busPeersByAddress;
 		QVariantList currentBusPeers;
 		std::set<std::uint8_t> connectedAddresses;
+
+		StackLog stackLog;
+		bool stackLogVerbose = false;
 
 		// Implements connecting, from the bus to a built implement.
 		ConnectionProgress connectionProgress;

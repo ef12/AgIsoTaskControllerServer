@@ -93,7 +93,7 @@ namespace agisotc
 		                        const isobus::TaskControllerOptions &options,
 		                        TaskControllerVersion versionToReport = TaskControllerVersion::SecondPublishedEdition);
 
-		~GuiTaskControllerServer() override = default;
+		~GuiTaskControllerServer() override;
 
 		// TaskControllerServer callbacks.
 		bool activate_object_pool(std::shared_ptr<isobus::ControlFunction> clientControlFunction,
@@ -147,6 +147,23 @@ namespace agisotc
 		/// @brief TC version a client reported in its technical capabilities, 0 if unknown.
 		std::uint8_t client_version(std::uint8_t address);
 
+		/// @brief Starts (stops) noting the senders of process data, for recover_unknown_clients().
+		void start_client_recovery();
+		void stop_client_recovery();
+
+		/// @brief Gets clients going again that are out of step with this server. Call from the thread
+		/// that pumps update(), after it.
+		/// - The stack accepts a client only after its working set master message, and forgets it
+		///   after 6 s without its status. A client that connects again (after a change of its DDOP)
+		///   without sending that message again is refused for ever. So a client the stack does not
+		///   know that runs the connection procedure is asked for the message, and is let in without
+		///   it if it does not answer.
+		/// - A client that sends process values for a pool this server does not have (it was
+		///   connected to this server before it restarted, within the client's 6 s time-out, or this
+		///   server timed it out) never uploads again by itself. So the TC status message is held
+		///   back for 7 s: the client loses the TC and connects again, with its pool.
+		void recover_unknown_clients();
+
 	private:
 		struct ClientRecord
 		{
@@ -159,6 +176,32 @@ namespace agisotc
 			bool uploadOpen = false;
 			std::uint16_t transfersInUpload = 0;
 		};
+
+		/// @brief A sender of process data, as noted on the stack's thread.
+		struct NotedSender
+		{
+			std::shared_ptr<isobus::ControlFunction> controlFunction;
+			bool connecting = false; ///< Sent a technical capabilities or device descriptor command.
+			bool values = false; ///< Sent process values.
+		};
+
+		/// @brief A client out of step with this server: one the stack does not know (yet) that runs
+		/// the connection procedure, or one that sends process values without an active pool here.
+		struct OutOfStepSender
+		{
+			std::shared_ptr<isobus::ControlFunction> controlFunction;
+			std::uint64_t firstSeenMs = 0;
+			std::uint64_t lastSeenMs = 0;
+			std::uint64_t lastRequestMs = 0;
+		};
+
+		/// @brief Adds a sender to a map of out-of-step senders, or notes that it was seen again.
+		static void note_out_of_step(std::map<std::uintptr_t, OutOfStepSender> &senders,
+		                             const std::shared_ptr<isobus::ControlFunction> &controlFunction,
+		                             std::uint64_t nowMs);
+
+		/// @brief Process data callback of the stack (its thread): notes the sender.
+		static void note_process_data_sender(const isobus::CANMessage &message, void *parentPointer);
 
 		ClientRecord &touch_locked(std::shared_ptr<isobus::ControlFunction> clientControlFunction);
 		void log_locked(const std::string &line);
@@ -174,5 +217,20 @@ namespace agisotc
 		bool rosterDirty = false;
 		bool identifyPending = false;
 		std::uint8_t identifyPendingNumber = 0;
+
+		// Client recovery: senders noted on the stack's thread (under mutex), handled on the pump thread.
+		std::vector<NotedSender> pendingSenders;
+		std::map<std::uintptr_t, OutOfStepSender> unknownSenders; ///< Not known to the stack, connecting.
+		std::map<std::uintptr_t, OutOfStepSender> poollessSenders; ///< Sending values without an active pool here.
+		bool recoveryStarted = false;
+		std::uint64_t statusHeldUntilMs = 0; ///< The TC status message is held back until then.
+		std::uint64_t lastStatusHoldMs = 0;
+		std::uintptr_t statusHoldKey = 0; ///< The client the status is held back for.
+		static constexpr std::uint64_t WORKING_SET_REQUEST_MS = 1000; ///< Between two requests for the message.
+		static constexpr std::uint64_t IMPLICIT_CLIENT_MS = 3000; ///< Without an answer, it is let in after this.
+		static constexpr std::uint64_t SENDER_SILENT_MS = 10000; ///< A sender silent this long is forgotten.
+		static constexpr std::uint64_t POOLLESS_MS = 2000; ///< Values without a pool this long hold the status.
+		static constexpr std::uint64_t STATUS_HOLD_MS = 7000; ///< Longer than a client's 6 s TC time-out.
+		static constexpr std::uint64_t STATUS_HOLD_REPEAT_MS = 30000; ///< At most one hold in this time.
 	};
 } // namespace agisotc

@@ -11,6 +11,7 @@
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QDebug>
 #include <QJsonObject>
 #include <QVariantMap>
 
@@ -184,12 +185,40 @@ namespace agisotc
 	{
 		currentSectionStates = QVariantList(currentSectionCount, QVariant(false));
 		logs.addLine("AgIso Task Controller Server ready. Pick a CAN driver and press Start.");
+
+		// The CAN stack's own log goes to the event log, from Info up; AGISOTC_STACK_LOG=debug also
+		// writes all of it, Debug included, and the server's own lines to the debug output (stderr
+		// with QT_FORCE_STDERR_LOGGING).
+		stackLogVerbose = (0 == qEnvironmentVariable("AGISOTC_STACK_LOG").compare("debug", Qt::CaseInsensitive));
+		isobus::CANStackLogger::set_can_stack_logger_sink(&stackLog);
+		isobus::CANStackLogger::set_log_level(stackLogVerbose ? isobus::CANStackLogger::LoggingLevel::Debug
+		                                                      : isobus::CANStackLogger::LoggingLevel::Info);
 	}
 
 	TcBridge::~TcBridge()
 	{
 		stopGps();
 		stopServer();
+		isobus::CANStackLogger::set_can_stack_logger_sink(nullptr);
+	}
+
+	void TcBridge::drainStackLog()
+	{
+		using Level = isobus::CANStackLogger::LoggingLevel;
+		for (const auto &line : stackLog.take_lines())
+		{
+			const QString text = QString::fromStdString(line.text).trimmed();
+			if (stackLogVerbose)
+			{
+				qInfo().noquote() << QDateTime::currentDateTime().toString("hh:mm:ss.zzz") << "[stack]" << text;
+			}
+			if (line.level < Level::Info)
+			{
+				continue;
+			}
+			const QString severity = (line.level >= Level::Error) ? "ERROR: " : ((Level::Warning == line.level) ? "WARNING: " : "");
+			logs.addLine(QString("[stack] %1%2").arg(severity, text));
+		}
 	}
 
 	bool TcBridge::isRunning() const
@@ -647,6 +676,7 @@ namespace agisotc
 		server->get_language_command_interface().set_language_code("en");
 		server->get_language_command_interface().set_country_code("US");
 		server->initialize();
+		server->start_client_recovery();
 		server->set_task_totals_active(taskActive);
 
 		pumpRunning = true;
@@ -677,6 +707,7 @@ namespace agisotc
 		}
 		if (nullptr != server)
 		{
+			server->stop_client_recovery();
 			server->terminate();
 			server.reset();
 		}
@@ -723,6 +754,7 @@ namespace agisotc
 			if (nullptr != server)
 			{
 				server->update();
+				server->recover_unknown_clients();
 			}
 			std::this_thread::sleep_for(std::chrono::milliseconds(50));
 		}
@@ -730,6 +762,7 @@ namespace agisotc
 
 	void TcBridge::poll()
 	{
+		drainStackLog();
 		drainBusFrames();
 		updateGps();
 		if (!gpsRunningFlag)
@@ -743,6 +776,10 @@ namespace agisotc
 		auto events = server->take_events();
 		for (const auto &line : events.logLines)
 		{
+			if (stackLogVerbose)
+			{
+				qInfo().noquote() << QDateTime::currentDateTime().toString("hh:mm:ss.zzz") << "[server]" << QString::fromStdString(line);
+			}
 			logs.addLine(QString("[%1] %2").arg(timestamp_now(), QString::fromStdString(line)));
 		}
 		// Process-data values, section states, and DDI traffic rows all come

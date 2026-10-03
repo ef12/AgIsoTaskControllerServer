@@ -39,7 +39,8 @@ add_library(tcserver_core STATIC
   src/core/SectionController.cpp
   src/core/SectionPlanner.cpp
   src/core/CoverageMap.cpp
-  src/core/ConnectionProgress.cpp)
+  src/core/ConnectionProgress.cpp
+  src/core/StackLog.cpp)
 if("WindowsCANAPI2" IN_LIST CAN_DRIVER)
   target_sources(tcserver_core PRIVATE src/core/PcanVirtualNetwork.cpp)
 endif()
