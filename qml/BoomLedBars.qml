@@ -14,7 +14,6 @@ ColumnLayout {
     property var booms: bridge.booms
     property int barHeight: 22
     property bool compact: false
-    property bool showLabels: true
 
     // The extent of all booms across the implement, in metres right of the connector.
     readonly property real spanLeft: {
@@ -46,7 +45,6 @@ ColumnLayout {
             spacing: 4
 
             RowLayout {
-                visible: root.showLabels
                 Layout.fillWidth: true
                 spacing: 8
                 Text {

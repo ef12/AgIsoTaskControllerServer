@@ -7,7 +7,7 @@ import "components"
 
 // The field in 3D: the tractor and the implement with its booms as LED bars, the field, the
 // coverage and the boundary, under a sky. Heads-up displays float over it: the implement, the
-// sections, the camera tools, the telemetry and, for the simulated GPS, the drive pad.
+// camera tools, the telemetry and, for the simulated GPS, the drive pad.
 // Mouse: drag to orbit, right/Shift-drag to pan, wheel to zoom, double-click to follow.
 // Keyboard (click the view first): W/S throttle, A/D steer, Space stop, C centre, F follow.
 FocusScope {
@@ -446,46 +446,6 @@ FocusScope {
                     color: Theme.textMuted
                     elide: Text.ElideRight
                 }
-            }
-        }
-    }
-
-    // --- sections ----------------------------------------------------------------------------
-    GlassPanel {
-        id: sectionsHud
-
-        readonly property real side: Math.max(implementChip.width, toolbar.width) + 24
-        readonly property bool besideChip: root.width - 2 * side >= 320
-
-        visible: bridge.booms.length > 0
-        width: besideChip ? Math.min(600, root.width - 2 * side) : Math.min(600, root.width - toolbar.width - 48)
-        height: sectionsColumn.implicitHeight + 20
-        x: besideChip ? (root.width - width) / 2 : 12
-        y: besideChip ? 12 : implementChip.y + implementChip.height + 8
-
-        ColumnLayout {
-            id: sectionsColumn
-            anchors.fill: parent
-            anchors.margins: 10
-            spacing: 6
-
-            RowLayout {
-                Layout.fillWidth: true
-                SectionLabel { text: "Sections" }
-                Item { Layout.fillWidth: true }
-                Text {
-                    text: bridge.activeSectionCount + " / " + bridge.sectionCount + " on"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontCaption
-                    font.weight: Font.DemiBold
-                    color: bridge.activeSectionCount > 0 ? Theme.accentText : Theme.textMuted
-                }
-            }
-            BoomLedBars {
-                Layout.fillWidth: true
-                compact: true
-                showLabels: false
-                barHeight: 14
             }
         }
     }

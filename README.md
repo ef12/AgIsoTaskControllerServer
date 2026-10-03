@@ -41,10 +41,10 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
   and the front wheels steer. A ground grid marks every 10 m and 50 m. The vehicles
   are built from Qt Quick 3D primitives (`qml/TractorModel.qml`,
   `qml/ImplementTrailer.qml`, `qml/WheelModel.qml`), so no model files are needed.
-  Over the view float the implement, the section bar, the camera tools (follow,
+  Over the view float the implement, the camera tools (follow,
   fit field, zoom, reset, field map), the speed, heading, worked area and sections
   on, and for the simulated GPS a drive pad (steering wheel, set speed, stop).
-- Section LED bars (the 3D view, the TC-SC tab and the map window): one bar per boom,
+- Section LED bars (the TC-SC tab and the map window): one bar per boom,
   drawn to scale and where the boom is across the implement, so a 31-row seeding boom
   shows 31 narrow LEDs and a 2-section fertilizer boom 2 wide ones
 - Task Controller data: TC-Basic, TC-SC, raw process data, DDI traffic and the event
