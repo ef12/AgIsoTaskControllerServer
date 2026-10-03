@@ -38,6 +38,13 @@ FocusScope {
     property real lastImplementZ: NaN
     readonly property real maxTravelStepM: 5
 
+    // The wheels turn with the distance eased over each position update (every 150 ms): turned in
+    // one jump, a small wheel moves further than half its spoke pattern and seems to turn backwards.
+    property real tractorWheelTravel: tractorTravel
+    property real implementWheelTravel: implementTravel
+    Behavior on tractorWheelTravel { NumberAnimation { duration: 150 } }
+    Behavior on implementWheelTravel { NumberAnimation { duration: 150 } }
+
     function addTravel() {
         const tractorStep = Math.hypot(bridge.tractorX - lastTractorX, bridge.tractorZ - lastTractorZ)
         if (isFinite(tractorStep) && tractorStep < maxTravelStepM)
@@ -282,13 +289,15 @@ FocusScope {
             position: Qt.vector3d(bridge.tractorX, 0, bridge.tractorZ)
             eulerRotation.y: -bridge.gpsCourse
             TractorModel {
-                travel: root.tractorTravel
+                travel: root.tractorWheelTravel
                 steering: bridge.steeringAngle
             }
         }
 
-        // The implement pivots around the tractor hitch and follows with its own heading.
+        // The implement pivots around the tractor hitch and follows with its own heading. It is
+        // shown only while its client is connected and built (see ImplementLoadingCard).
         Node {
+            visible: bridge.implementReady
             position: Qt.vector3d(bridge.implementX, 0.8, bridge.implementZ)
             eulerRotation.y: -bridge.implementCourse
             // The connector, and the booms that carry sections with their sections:
@@ -322,7 +331,7 @@ FocusScope {
             ImplementTrailer {
                 y: -0.8
                 booms: bridge.booms
-                travel: root.implementTravel
+                travel: root.implementWheelTravel
             }
 
             // Each boom as an LED bar trailing the tractor: a dark rail as wide as
@@ -399,9 +408,19 @@ FocusScope {
         Behavior on border.color { ColorAnimation { duration: Theme.normal } }
     }
 
-    // --- implement ---------------------------------------------------------------------------
+    // --- implement: its name, or how far it is in connecting ---------------------------------
+    ImplementLoadingCard {
+        x: 12
+        y: 12
+        width: Math.min(implicitWidth, root.width - toolbar.width - 48)
+        height: implicitHeight
+    }
+
     GlassPanel {
         id: implementChip
+        visible: opacity > 0.01
+        opacity: bridge.implementLoading.active ? 0 : 1
+        Behavior on opacity { NumberAnimation { duration: Theme.slow } }
         x: 12
         y: 12
         width: Math.min(360, chipRow.implicitWidth + 24)
@@ -418,12 +437,12 @@ FocusScope {
                 implicitWidth: 32
                 implicitHeight: 32
                 radius: 8
-                color: bridge.booms.length > 0 ? Theme.alpha(Theme.accent, 0.16) : Theme.surfacePressed
+                color: bridge.implementReady ? Theme.alpha(Theme.accent, 0.16) : Theme.surfacePressed
                 Icon {
                     anchors.centerIn: parent
                     name: "tractor"
                     size: 18
-                    color: bridge.booms.length > 0 ? Theme.accentText : Theme.textMuted
+                    color: bridge.implementReady ? Theme.accentText : Theme.textMuted
                 }
             }
             ColumnLayout {
@@ -431,7 +450,7 @@ FocusScope {
                 spacing: 0
                 Text {
                     Layout.fillWidth: true
-                    text: bridge.implementName
+                    text: bridge.implementReady ? bridge.implementName : "No implement connected"
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSmall
                     font.weight: Font.DemiBold
@@ -440,7 +459,8 @@ FocusScope {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: bridge.implementGeometryStatus
+                    text: bridge.implementReady ? bridge.implementGeometryStatus
+                                                : (bridge.running ? "Waiting for an implement on the bus" : "Start the server to connect implements")
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontCaption
                     color: Theme.textMuted

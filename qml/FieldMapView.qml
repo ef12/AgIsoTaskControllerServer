@@ -173,27 +173,29 @@ Item {
                 }
             }
 
-            // Trailed implement (rectangle, heading of implement)
             if (bridge.gpsValid) {
-                var ix = root.toScreenX(bridge.implementX), iy = root.toScreenZ(bridge.implementZ);
-                ctx.save();
-                ctx.translate(ix, iy);
-                ctx.rotate(bridge.implementCourse * Math.PI / 180);
-                var il = 6 * root.scale, iw = 3 * root.scale;
-                ctx.fillStyle = "#3a4149";
-                ctx.strokeStyle = "#9aa3ad";
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.rect(-iw / 2, -il / 2, iw, il);
-                ctx.fill();
-                ctx.stroke();
-                // Hitch bar toward tractor
-                ctx.strokeStyle = "#9aa3ad";
-                ctx.beginPath();
-                ctx.moveTo(0, -il / 2);
-                ctx.lineTo(0, -il / 2 - 2.8 * root.scale);
-                ctx.stroke();
-                ctx.restore();
+                // Trailed implement (rectangle, heading of implement), while one is connected
+                if (bridge.implementReady) {
+                    var ix = root.toScreenX(bridge.implementX), iy = root.toScreenZ(bridge.implementZ);
+                    ctx.save();
+                    ctx.translate(ix, iy);
+                    ctx.rotate(bridge.implementCourse * Math.PI / 180);
+                    var il = 6 * root.scale, iw = 3 * root.scale;
+                    ctx.fillStyle = "#3a4149";
+                    ctx.strokeStyle = "#9aa3ad";
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.rect(-iw / 2, -il / 2, iw, il);
+                    ctx.fill();
+                    ctx.stroke();
+                    // Hitch bar toward tractor
+                    ctx.strokeStyle = "#9aa3ad";
+                    ctx.beginPath();
+                    ctx.moveTo(0, -il / 2);
+                    ctx.lineTo(0, -il / 2 - 2.8 * root.scale);
+                    ctx.stroke();
+                    ctx.restore();
+                }
 
                 // Tractor top view: front = driving direction = up at course 0.
                 var px = root.toScreenX(bridge.tractorX), py = root.toScreenZ(bridge.tractorZ);

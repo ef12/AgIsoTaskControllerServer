@@ -38,7 +38,8 @@ add_library(tcserver_core STATIC
   src/core/TcClientPlan.cpp
   src/core/SectionController.cpp
   src/core/SectionPlanner.cpp
-  src/core/CoverageMap.cpp)
+  src/core/CoverageMap.cpp
+  src/core/ConnectionProgress.cpp)
 if("WindowsCANAPI2" IN_LIST CAN_DRIVER)
   target_sources(tcserver_core PRIVATE src/core/PcanVirtualNetwork.cpp)
 endif()
@@ -58,6 +59,9 @@ if(AGISOTC_BUILD_TESTS)
   add_executable(tc_plan_tests tests/tc_plan_tests.cpp)
   target_link_libraries(tc_plan_tests PRIVATE tcserver_core)
   add_test(NAME tc_plan COMMAND tc_plan_tests)
+  add_executable(connection_progress_tests tests/connection_progress_tests.cpp)
+  target_link_libraries(connection_progress_tests PRIVATE tcserver_core)
+  add_test(NAME connection_progress COMMAND connection_progress_tests)
 endif()
 
 if(AGISOTC_BUILD_GUI)

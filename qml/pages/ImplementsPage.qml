@@ -375,7 +375,7 @@ Item {
                         }
                     }
                     AppSpinBox {
-                        Layout.preferredWidth: 120
+                        Layout.preferredWidth: 112
                         from: 250
                         to: 60000
                         stepSize: 250
@@ -387,9 +387,9 @@ Item {
                     }
                     Item { Layout.fillWidth: true }
                     AppButton {
-                        size: "sm"
-                        text: "Request all"
+                        variant: "ghost"
                         iconName: "refresh"
+                        tip: "Request all declared values now"
                         onClicked: bridge.requestImplementDdis()
                     }
                 }

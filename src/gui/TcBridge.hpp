@@ -21,8 +21,10 @@
 #include <QStringList>
 #include <QUrl>
 #include <QVariantList>
+#include <QVariantMap>
 
 #include "CanBusManager.hpp"
+#include "ConnectionProgress.hpp"
 #include "CoverageMap.hpp"
 #include "FieldTaskManager.hpp"
 #include "GpsProvider.hpp"
@@ -88,6 +90,13 @@ namespace agisotc
 		Q_PROPERTY(QString activeTaskName READ activeTaskName NOTIFY tasksChanged)
 		Q_PROPERTY(double fieldWidthM READ fieldWidthM NOTIFY fieldsChanged)
 		Q_PROPERTY(double fieldLengthM READ fieldLengthM NOTIFY fieldsChanged)
+		/// The implement furthest along in connecting, for a progress display: active, step (1 starting
+		/// up, 2 connecting, 3 uploading its DDOP, 4 building, 5 ready), progress (0..1), address,
+		/// transferBytes, receivedBytes, uploadSkipped, geometryReceived, geometryTotal, elapsedMs, name.
+		Q_PROPERTY(QVariantMap implementLoading READ implementLoading NOTIFY implementLoadingChanged)
+		/// True while the selected client is connected with an active pool and built: the views show
+		/// the implement only then.
+		Q_PROPERTY(bool implementReady READ implementReady NOTIFY implementReadyChanged)
 		Q_PROPERTY(QString implementName READ implementName NOTIFY implementChanged)
 		Q_PROPERTY(QString implementGeometryStatus READ implementGeometryStatus NOTIFY implementChanged)
 		Q_PROPERTY(QVariantList implementElements READ implementElements NOTIFY implementChanged)
@@ -152,6 +161,8 @@ namespace agisotc
 		QString activeTaskName() const;
 		double fieldWidthM() const;
 		double fieldLengthM() const;
+		QVariantMap implementLoading() const;
+		bool implementReady() const;
 		QString implementName() const;
 		QString implementGeometryStatus() const;
 		QVariantList implementElements() const;
@@ -245,6 +256,8 @@ namespace agisotc
 		void workChanged();
 		void sectionControlChanged();
 		void drivingControlsChanged();
+		void implementLoadingChanged();
+		void implementReadyChanged();
 		void identifyBanner(int tcNumber);
 
 	private:
@@ -273,6 +286,14 @@ namespace agisotc
 		void updateNmea2000Gps();
 		void rebuildFieldBoundaryPoints();
 		void refreshBusPeers();
+		/// @brief True while the client is connected with an active pool (and the server runs).
+		bool isClientOnline(int address);
+		/// @brief Follows the connecting implements: geometry of the selected client, the progress
+		/// for the views, the log line of an implement that got ready, and implementReady.
+		void serviceImplementLoading(std::uint64_t nowMs);
+		/// @brief Asks the selected client again for the geometry values still missing while its
+		/// implement is being built, so one lost request does not hold the implement back.
+		void serviceGeometryRequests(std::uint64_t nowMs);
 		void ingestSniffedProcessData(int source, int destination, bool outgoing,
 		                              std::uint8_t command, std::uint16_t ddi,
 		                              std::uint16_t element, std::int32_t value);
@@ -340,6 +361,21 @@ namespace agisotc
 		std::map<std::uint8_t, BusPeerInfo> busPeersByAddress;
 		QVariantList currentBusPeers;
 		std::set<std::uint8_t> connectedAddresses;
+
+		// Implements connecting, from the bus to a built implement.
+		ConnectionProgress connectionProgress;
+		/// Per client address: pool active and timed out as last seen, to notice activations and time-outs.
+		struct ClientLink
+		{
+			bool active = false;
+			bool timedOut = false;
+		};
+		std::map<int, ClientLink> clientLinks;
+		QVariantMap currentImplementLoading;
+		bool selectedClientOnline = false;
+		bool implementReadyFlag = false;
+		std::uint64_t lastGeometryRequestMs = 0;
+		static constexpr std::uint64_t GEOMETRY_REQUEST_MS = 500;
 
 		bool running = false;
 		bool taskActive = false;

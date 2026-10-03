@@ -321,6 +321,8 @@ namespace agisotc
 		return currentFieldLengthM;
 	}
 
+	QVariantMap TcBridge::implementLoading() const { return currentImplementLoading; }
+	bool TcBridge::implementReady() const { return implementReadyFlag; }
 	QString TcBridge::implementName() const { return currentImplementName; }
 	QString TcBridge::implementGeometryStatus() const { return currentImplementGeometryStatus; }
 	QVariantList TcBridge::implementElements() const { return currentImplementElements; }
@@ -370,6 +372,8 @@ namespace agisotc
 		{
 			return;
 		}
+		const auto ourControl = canBus.internal_control_function();
+		const int ourAddress = (nullptr != ourControl) ? static_cast<int>(ourControl->get_address()) : -1;
 		for (const auto &frame : canBus.take_sniffed_frames())
 		{
 			std::uint32_t pgn = frame.identifier;
@@ -402,11 +406,23 @@ namespace agisotc
 				info.lastSeenMs = steady_clock_ms();
 				busPeersByAddress[static_cast<std::uint8_t>(source)] = info;
 				refreshBusPeers();
+				connectionProgress.on_address_claim(static_cast<std::uint8_t>(source), rawName, info.lastSeenMs);
+			}
+			// Implements connecting: their working set master message and all they send this TC,
+			// the DDOP upload's transport frames included.
+			if (!frame.outgoing && (source >= 0) && (source <= 253))
+			{
+				if (0xFE0D == pgn)
+				{
+					connectionProgress.on_working_set_master(static_cast<std::uint8_t>(source), frame.timestampMs);
+				}
+				else if ((destination == ourAddress) && (frame.identifier > 0x7FF))
+				{
+					connectionProgress.on_frame_to_tc(static_cast<std::uint8_t>(source), pgn, frame.data, frame.length, frame.timestampMs);
+				}
 			}
 			if ((0xCB00 == pgn) && (8 == frame.length) && (frame.identifier > 0x7FF))
 			{
-				const auto ourControl = canBus.internal_control_function();
-				const int ourAddress = (nullptr != ourControl) ? static_cast<int>(ourControl->get_address()) : -1;
 				if (!frame.outgoing && (destination == ourAddress) && (0x10 == frame.data[0]))
 				{
 					// A client's version message: say when it has more than this TC offers, since
@@ -678,6 +694,24 @@ namespace agisotc
 		emit sectionControlChanged();
 		running = false;
 		emit runningChanged();
+
+		// No server, no connections: the clients, their implement and what was connecting go.
+		connectionProgress.reset();
+		clientLinks.clear();
+		connectedAddresses.clear();
+		busPeersByAddress.clear();
+		refreshBusPeers();
+		clients.setClients({});
+		selectedClientOnline = false;
+		manualPool.clear();
+		manualPoolClient = -1;
+		if (-1 != currentSelectedClient)
+		{
+			currentSelectedClient = -1;
+			emit selectedClientChanged();
+		}
+		refreshDdop();
+		serviceImplementLoading(steady_clock_ms());
 		setStatus("Server stopped.");
 		logs.addLine("[bus] Server stopped.");
 	}
@@ -756,6 +790,8 @@ namespace agisotc
 		serviceSectionControl(nowMs);
 		serviceRateControl(nowMs);
 		publishImplementModelIfDue(nowMs);
+		serviceGeometryRequests(nowMs);
+		serviceImplementLoading(nowMs);
 	}
 
 	bool TcBridge::isShownElement(const ImplementElementState &element) const
@@ -801,12 +837,26 @@ namespace agisotc
 	{
 		QList<ClientRow> rows;
 		connectedAddresses.clear();
+		const std::uint64_t nowMs = steady_clock_ms();
 		for (const auto &snapshot : server->clients_snapshot())
 		{
 			if (snapshot.ddopActive && !snapshot.timedOut && (snapshot.address <= 253))
 			{
 				connectedAddresses.insert(static_cast<std::uint8_t>(snapshot.address));
 			}
+			// An activated pool lets the implement be built; a time-out ends its connection.
+			auto &link = clientLinks[snapshot.address];
+			const bool active = snapshot.ddopActive && !snapshot.timedOut;
+			if ((snapshot.address <= 253) && active && !link.active)
+			{
+				connectionProgress.on_pool_activated(static_cast<std::uint8_t>(snapshot.address), nowMs);
+			}
+			if ((snapshot.address <= 253) && snapshot.timedOut && !link.timedOut)
+			{
+				connectionProgress.on_client_lost(static_cast<std::uint8_t>(snapshot.address));
+			}
+			link.active = active;
+			link.timedOut = snapshot.timedOut;
 			ClientRow row;
 			row.address = snapshot.address;
 			row.nameHex = QString("0x%1").arg(snapshot.nameRaw, 16, 16, QChar('0')).toUpper();
@@ -847,6 +897,17 @@ namespace agisotc
 			emit selectedClientChanged();
 			refreshDdop();
 		}
+
+		// Without a connection there is no implement: a client that timed out or deactivated its
+		// pool takes it out of the views. It comes back when the client activates its pool again.
+		const bool online = (-1 != currentSelectedClient) &&
+		  (connectedAddresses.find(static_cast<std::uint8_t>(currentSelectedClient)) != connectedAddresses.end());
+		const bool wentOffline = selectedClientOnline && !online;
+		selectedClientOnline = online;
+		if (wentOffline)
+		{
+			refreshDdop();
+		}
 		refreshBusPeers();
 	}
 
@@ -856,7 +917,8 @@ namespace agisotc
 		std::vector<std::uint8_t> binary;
 		clearImplementModel();
 
-		if ((manualPoolClient == currentSelectedClient) && !manualPool.empty())
+		const bool manual = (manualPoolClient == currentSelectedClient) && !manualPool.empty();
+		if (manual)
 		{
 			binary = manualPool;
 		}
@@ -868,6 +930,13 @@ namespace agisotc
 		if ((-1 == currentSelectedClient))
 		{
 			rows.push_back({ 0, "Select a client to inspect its DDOP." });
+		}
+		else if (!manual && !binary.empty() && !isClientOnline(currentSelectedClient))
+		{
+			// The pool stays stored, so the client need not upload it again, but a client that is not
+			// connected shows no objects.
+			rows.push_back({ 0, QString("Client %1 is not connected.").arg(currentSelectedClient) });
+			rows.push_back({ 0, "Its device descriptor shows here again when it connects." });
 		}
 		else if (binary.empty())
 		{
@@ -885,10 +954,16 @@ namespace agisotc
 			}
 			else
 			{
-				buildImplementModel(pool);
-				// Pull live values immediately so the Raw tab fills without
-				// waiting for the trickle sync; quiet implements only answer.
-				requestImplementDdis();
+				// The implement is built only for a connected client; the stored pool of one that is
+				// gone stays listed here.
+				if (isClientOnline(currentSelectedClient))
+				{
+					buildImplementModel(pool);
+					// Pull live values immediately so the Raw tab fills without
+					// waiting for the trickle sync; quiet implements only answer.
+					requestImplementDdis();
+					lastGeometryRequestMs = steady_clock_ms();
+				}
 				rows.push_back({ 0, QString("%1 objects (%2 bytes)").arg(pool.size()).arg(binary.size()) });
 				for (std::uint16_t i = 0; i < pool.size(); ++i)
 				{
@@ -944,6 +1019,8 @@ namespace agisotc
 		currentTcBasicData.clear();
 		currentBooms.clear();
 		boomLedRows.clear();
+		implementElementRows.clear();
+		publishedLedStates.clear();
 		nextDdiSyncIndex = 0;
 		lastDdiSyncMs = 0;
 		emit implementChanged();
@@ -1496,6 +1573,109 @@ namespace agisotc
 			++nextDdiSyncIndex;
 		}
 		lastDdiSyncMs = now;
+	}
+
+	bool TcBridge::isClientOnline(int address)
+	{
+		if (!running || (nullptr == server) || (address < 0))
+		{
+			return false;
+		}
+		for (const auto &snapshot : server->clients_snapshot())
+		{
+			if (static_cast<int>(snapshot.address) == address)
+			{
+				return snapshot.ddopActive && !snapshot.timedOut;
+			}
+		}
+		return false;
+	}
+
+	void TcBridge::serviceGeometryRequests(std::uint64_t nowMs)
+	{
+		if (!selectedClientOnline || connectionProgress.is_ready(static_cast<std::uint8_t>(currentSelectedClient)) ||
+		    ((nowMs - lastGeometryRequestMs) < GEOMETRY_REQUEST_MS))
+		{
+			return;
+		}
+		auto client = server->find_client(static_cast<std::uint8_t>(currentSelectedClient));
+		if (nullptr == client)
+		{
+			return;
+		}
+		constexpr int MAX_REQUESTS = 16;
+		int sent = 0;
+		for (const auto &state : implementDdiStates)
+		{
+			if ((0 != state.geometryKind) && !state.hasValue && (sent < MAX_REQUESTS))
+			{
+				server->send_request_value(client, state.ddi, state.element);
+				++sent;
+			}
+		}
+		lastGeometryRequestMs = nowMs;
+	}
+
+	void TcBridge::serviceImplementLoading(std::uint64_t nowMs)
+	{
+		// The geometry the selected client's implement still waits for.
+		if (selectedClientOnline && !implementElementStates.empty())
+		{
+			int received = 0;
+			int total = 0;
+			for (const auto &state : implementDdiStates)
+			{
+				if (0 == state.geometryKind) continue;
+				++total;
+				received += state.hasValue ? 1 : 0;
+			}
+			connectionProgress.on_geometry(static_cast<std::uint8_t>(currentSelectedClient), received, total, nowMs);
+		}
+
+		const auto state = connectionProgress.current(nowMs);
+		QVariantMap loading;
+		loading["active"] = (ConnectionProgress::Step::None != state.step);
+		loading["step"] = static_cast<int>(state.step);
+		loading["progress"] = state.progress;
+		loading["address"] = state.address;
+		loading["transferBytes"] = static_cast<qlonglong>(state.transferBytes);
+		loading["receivedBytes"] = static_cast<qlonglong>(state.receivedBytes);
+		loading["uploadSkipped"] = state.uploadSkipped;
+		loading["geometryReceived"] = state.geometryReceived;
+		loading["geometryTotal"] = state.geometryTotal;
+		loading["elapsedMs"] = static_cast<qlonglong>(state.elapsedMs);
+		loading["name"] = ((state.address == currentSelectedClient) && (state.step >= ConnectionProgress::Step::Building)) ? currentImplementName : QString();
+		if (loading != currentImplementLoading)
+		{
+			currentImplementLoading = loading;
+			emit implementLoadingChanged();
+		}
+
+		ConnectionProgress::Timings timings;
+		while (connectionProgress.take_completed(timings))
+		{
+			const auto seconds = [](std::uint64_t ms) { return QString::number(static_cast<double>(ms) / 1000.0, 'f', 1) + " s"; };
+			QStringList steps;
+			if (timings.startUpMs > 0) steps << "start-up " + seconds(timings.startUpMs);
+			steps << "connection " + seconds(timings.connectMs);
+			if (timings.uploadedBytes > 0)
+			{
+				steps << QString("DDOP upload %1 (%2 kB)").arg(seconds(timings.uploadMs)).arg(static_cast<double>(timings.uploadedBytes) / 1024.0, 0, 'f', 1);
+			}
+			else
+			{
+				steps << "stored DDOP, no upload";
+			}
+			steps << "geometry " + seconds(timings.buildMs);
+			logs.addLine(QString("[connect] Implement %1 ready in %2: %3.").arg(timings.address).arg(seconds(timings.totalMs), steps.join(", ")));
+		}
+
+		const bool ready = selectedClientOnline && connectionProgress.is_ready(static_cast<std::uint8_t>(currentSelectedClient));
+		if (ready != implementReadyFlag)
+		{
+			implementReadyFlag = ready;
+			emit implementReadyChanged();
+		}
 	}
 
 	void TcBridge::selectClient(int address)

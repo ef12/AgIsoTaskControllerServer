@@ -44,6 +44,13 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
   Over the view float the implement, the camera tools (follow,
   fit field, zoom, reset, field map), the speed, heading, worked area and sections
   on, and for the simulated GPS a drive pad (steering wheel, set speed, stop).
+- Implement connection: the views show the implement only while its client is
+  connected with an active pool; without a connection (none yet, timed out, server
+  stopped) only the tractor is shown. While an implement connects, a progress card
+  follows it from its address claim: its start-up wait (ISO 11783-10: 6 s, then the
+  next TC status message), the connection, the DDOP upload (bytes received) and the
+  geometry values. The implement appears once it is complete, and the Event log
+  records how long each step took (`[connect] Implement 128 ready in 8.5 s: ...`).
 - Section LED bars (the TC-SC tab and the map window): one bar per boom,
   drawn to scale and where the boom is across the implement, so a 31-row seeding boom
   shows 31 narrow LEDs and a 2-section fertilizer boom 2 wide ones

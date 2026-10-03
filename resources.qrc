@@ -13,6 +13,7 @@
     <file>qml/ProcessDataPanel.qml</file>
     <file>qml/ProcessDataWindow.qml</file>
     <file>qml/SectionView3D.qml</file>
+    <file>qml/ImplementLoadingCard.qml</file>
     <file>qml/DrivePad.qml</file>
     <file>qml/SteeringWheel.qml</file>
     <file>qml/MapWindow.qml</file>
@@ -49,6 +50,7 @@
     <file>qml/components/SectionLabel.qml</file>
     <file>qml/components/StatusBadge.qml</file>
     <file>qml/components/Tabs.qml</file>
+    <file>qml/components/Spinner.qml</file>
     <file>qml/components/Toast.qml</file>
     <file alias="icons/logo.ico">doc/logo.ico</file>
   </qresource>
