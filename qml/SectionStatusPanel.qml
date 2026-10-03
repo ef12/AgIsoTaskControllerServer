@@ -1,21 +1,46 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
+import AgIsoTc 1.0
+import "components"
 
-// Compact TC-SC section strip: one LED bar per boom (BoomLedBars, bridge.booms), or without a
-// client DDOP one block per section (green = ON, bridge.sectionStates), plus worked totals.
-GroupBox {
-    title: "Sections"
+// Compact TC-SC section strip for the map window: one LED bar per boom (BoomLedBars,
+// bridge.booms), or without a client DDOP one block per section (bridge.sectionStates), plus
+// the worked area.
+GlassPanel {
+    id: root
+
+    implicitHeight: column.implicitHeight + 24
 
     ColumnLayout {
+        id: column
         anchors.fill: parent
-        spacing: 6
+        anchors.margins: 12
+        spacing: 8
 
-        Label {
-            text: bridge.activeSectionCount + " of " + bridge.sectionCount + " sections ON"
-            color: bridge.activeSectionCount > 0 ? "#f2d33c" : "#8995a3"
-            font.bold: true
-            font.pixelSize: 13
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 10
+            SectionLabel { text: "Sections" }
+            Text {
+                text: bridge.activeSectionCount + " / " + bridge.sectionCount + " on"
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSmall
+                font.weight: Font.DemiBold
+                color: bridge.activeSectionCount > 0 ? Theme.accentText : Theme.textMuted
+            }
+            Item { Layout.fillWidth: true }
+            Icon {
+                name: "sprout"
+                size: 14
+                color: Theme.textMuted
+            }
+            Text {
+                text: bridge.workedAreaHa.toFixed(3) + " ha worked"
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSmall
+                font.weight: Font.DemiBold
+                color: bridge.workedAreaHa > 0 ? Theme.accentText : Theme.textSecondary
+            }
         }
 
         BoomLedBars {
@@ -25,36 +50,28 @@ GroupBox {
             barHeight: 18
         }
 
-        GridLayout {
+        Flow {
             visible: bridge.booms.length === 0
             Layout.fillWidth: true
-            columns: 8
-            columnSpacing: 4
-            rowSpacing: 4
+            spacing: 4
             Repeater {
                 model: bridge.sectionStates
                 delegate: Rectangle {
-                    Layout.preferredWidth: 22
-                    Layout.preferredHeight: 22
-                    radius: 4
-                    color: modelData ? "#35c759" : "#2b333d"
-                    border.color: modelData ? "#7ce796" : "#59636f"
-                    border.width: 1
+                    width: 24
+                    height: 22
+                    radius: 5
+                    color: modelData ? Theme.ledOn : Theme.ledOff
+                    border.color: modelData ? Theme.ledOnBorder : Theme.ledOffBorder
                     Text {
                         anchors.centerIn: parent
                         text: index + 1
+                        font.family: Theme.fontFamily
                         font.pixelSize: 10
-                        color: modelData ? "#0d2812" : "#8995a3"
+                        font.weight: Font.DemiBold
+                        color: modelData ? Theme.ledOnText : Theme.textMuted
                     }
                 }
             }
-        }
-
-        Label {
-            text: bridge.workedAreaHa.toFixed(3) + " ha worked"
-            color: "#8fe388"
-            font.bold: true
-            font.pixelSize: 13
         }
     }
 }

@@ -1,86 +1,185 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
+import AgIsoTc 1.0
+import "components"
 
-// Detached field-operation window: 2D map, section strip, and field drawing controls.
+// Detached field-operation window: the 2D map with floating panels for the GPS position, the
+// field drawing tools and the sections.
 Window {
     id: root
     visible: false
-    width: 1100
-    height: 750
-    minimumWidth: 800
+    width: 1200
+    height: 800
+    minimumWidth: 860
     minimumHeight: 600
-    title: "Field operation map"
-    color: "#1b1e24"
+    title: "Field map"
+    color: Theme.bg
 
-    ColumnLayout {
+    Item {
         anchors.fill: parent
-        anchors.margins: 8
-        spacing: 8
+        anchors.margins: 10
 
         FieldMapView {
             id: fieldMap
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            drawMode: drawModeBox.checked
+            anchors.fill: parent
+            drawMode: drawSwitch.checked
             nudgeStepM: Number(nudgeStepBox.currentText)
         }
 
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 8
+        CornerMask {
+            radius: Theme.radiusLg
+            color: Theme.bg
+        }
+        Rectangle {
+            anchors.fill: parent
+            radius: Theme.radiusLg
+            color: "transparent"
+            border.color: Theme.border
+        }
 
-            SectionStatusPanel {
-                Layout.fillWidth: true
-            }
+        // --- GPS -------------------------------------------------------------------------------
+        GlassPanel {
+            x: 12
+            y: 12
+            width: gpsRow.implicitWidth + 24
+            height: 48
 
-            GroupBox {
-                title: "Draw field"
-                RowLayout {
-                    anchors.fill: parent
-                    CheckBox {
-                        id: drawModeBox
-                        text: "Draw"
-                        checked: true
+            RowLayout {
+                id: gpsRow
+                anchors.centerIn: parent
+                spacing: 10
+                CompassDial {
+                    size: 30
+                    course: bridge.gpsCourse
+                    active: bridge.gpsValid
+                }
+                ColumnLayout {
+                    spacing: 0
+                    Text {
+                        text: bridge.gpsValid ? bridge.gpsLatitude.toFixed(7) + ", " + bridge.gpsLongitude.toFixed(7)
+                                              : "Waiting for a position"
+                        font.family: bridge.gpsValid ? Theme.monoFamily : Theme.fontFamily
+                        font.pixelSize: Theme.fontSmall
+                        font.weight: Font.DemiBold
+                        color: bridge.gpsValid ? Theme.text : Theme.textMuted
                     }
-                    Label { text: "Nudge m"; color: "#c7d0dc" }
-                    ComboBox {
-                        id: nudgeStepBox
-                        model: ["0.01", "0.05", "0.1", "0.5", "1", "5"]
-                        currentIndex: 2
-                        Layout.preferredWidth: 82
-                    }
-                    Button {
-                        text: "Create field"
-                        enabled: fieldMap.draftPoints.length >= 3
-                        onClicked: {
-                            if (bridge.createFieldFromLocalBoundary(fieldNameField.text, fieldMap.draftPoints))
-                                fieldMap.clearDraft()
-                        }
-                    }
-                    Button {
-                        text: "Clear"
-                        enabled: fieldMap.draftPoints.length > 0
-                        onClicked: fieldMap.clearDraft()
-                    }
-                    TextField {
-                        id: fieldNameField
-                        text: bridge.fieldNames.length > 0 ? bridge.fieldNames[0] : "Field 1"
-                        Layout.preferredWidth: 160
+                    Text {
+                        text: bridge.gpsValid ? bridge.gpsSpeedKph.toFixed(1) + " km/h · " + bridge.gpsCourse.toFixed(0) + "°"
+                                              : "GPS: " + bridge.gpsSourceText
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontCaption
+                        color: Theme.textMuted
                     }
                 }
             }
+        }
 
-            GroupBox {
-                title: "GPS"
-                Label {
-                    text: bridge.gpsValid
-                          ? bridge.gpsLatitude.toFixed(7) + ", " + bridge.gpsLongitude.toFixed(7)
-                            + "  " + bridge.gpsSpeedKph.toFixed(1) + " km/h"
-                          : "Waiting for position (" + bridge.gpsSourceText + ")"
-                    color: bridge.gpsValid ? "#dce8f5" : "#8995a3"
+        // --- drawing tools ---------------------------------------------------------------------
+        GlassPanel {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 12
+            width: drawRow.implicitWidth + 20
+            height: 52
+
+            RowLayout {
+                id: drawRow
+                anchors.centerIn: parent
+                spacing: 10
+
+                AppSwitch {
+                    id: drawSwitch
+                    text: "Draw"
+                    checked: true
+                    focusPolicy: Qt.NoFocus
+                }
+                Rectangle {
+                    Layout.preferredWidth: 1
+                    Layout.preferredHeight: 22
+                    color: Theme.hudBorder
+                }
+                AppTextField {
+                    id: fieldNameField
+                    Layout.preferredWidth: 160
+                    placeholderText: "Field name"
+                    text: "Field " + (bridge.fieldNames.length + 1)
+                }
+                Text {
+                    text: "Nudge"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSmall
+                    color: Theme.textMuted
+                }
+                AppComboBox {
+                    id: nudgeStepBox
+                    Layout.preferredWidth: 92
+                    model: ["0.01", "0.05", "0.1", "0.5", "1", "5"]
+                    currentIndex: 2
+                    displayText: currentText + " m"
+                    focusPolicy: Qt.NoFocus
+                }
+                AppButton {
+                    text: "Clear"
+                    iconName: "x"
+                    variant: "ghost"
+                    enabled: fieldMap.draftPoints.length > 0
+                    focusPolicy: Qt.NoFocus
+                    onClicked: fieldMap.clearDraft()
+                }
+                AppButton {
+                    text: "Create field"
+                    iconName: "check"
+                    variant: "primary"
+                    enabled: fieldMap.draftPoints.length >= 3
+                    focusPolicy: Qt.NoFocus
+                    onClicked: {
+                        if (bridge.createFieldFromLocalBoundary(fieldNameField.text, fieldMap.draftPoints))
+                            fieldMap.clearDraft()
+                    }
                 }
             }
+        }
+
+        // drawing help
+        GlassPanel {
+            visible: drawSwitch.checked
+            anchors.left: parent.left
+            anchors.bottom: sections.top
+            anchors.margins: 12
+            width: helpColumn.implicitWidth + 24
+            height: helpColumn.implicitHeight + 20
+
+            ColumnLayout {
+                id: helpColumn
+                anchors.centerIn: parent
+                spacing: 4
+                Text {
+                    text: fieldMap.draftPoints.length === 0 ? "Click on the map to place the first corner"
+                          : fieldMap.draftPoints.length + (fieldMap.draftPoints.length === 1 ? " corner" : " corners")
+                            + (fieldMap.draftPoints.length < 3 ? " — at least 3 make a field" : "")
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSmall
+                    font.weight: Font.DemiBold
+                    color: Theme.text
+                }
+                Text {
+                    text: "Drag a corner to move it · arrow keys nudge the selected one · Delete removes it"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontCaption
+                    color: Theme.textMuted
+                }
+            }
+        }
+
+        // --- sections --------------------------------------------------------------------------
+        SectionStatusPanel {
+            id: sections
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
+            anchors.bottomMargin: 12
+            height: implicitHeight
         }
     }
 }

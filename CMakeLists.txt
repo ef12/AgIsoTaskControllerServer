@@ -61,7 +61,7 @@ if(AGISOTC_BUILD_TESTS)
 endif()
 
 if(AGISOTC_BUILD_GUI)
-  find_package(Qt6 6.5 REQUIRED COMPONENTS Core Quick Quick3D Qml)
+  find_package(Qt6 6.5 REQUIRED COMPONENTS Core Quick QuickControls2 Quick3D Qml)
   qt_standard_project_setup()
   set(CMAKE_AUTORCC ON)
 
@@ -81,6 +81,7 @@ if(AGISOTC_BUILD_GUI)
       tcserver_core
       Qt6::Core
       Qt6::Quick
+      Qt6::QuickControls2
       Qt6::Quick3D
       Qt6::Qml)
 
@@ -163,22 +164,8 @@ if(WIN32 AND AGISOTC_BUILD_GUI)
       COMMAND ${CMAKE_COMMAND} -E copy_directory
         $<TARGET_FILE_DIR:AgIsoTaskControllerServer>
         ${CMAKE_CURRENT_BINARY_DIR}/stage
-      COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/Main.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/TopBar.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/ClientPanel.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/ProcessDataPanel.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/ProcessDataWindow.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/SectionView3D.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/OperationsPanel.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/MapWindow.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/FieldMapView.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/SectionStatusPanel.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/BoomLedBars.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/Part3D.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/WheelModel.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/TractorModel.qml
-        ${CMAKE_CURRENT_SOURCE_DIR}/qml/ImplementTrailer.qml
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/qml
         ${CMAKE_CURRENT_BINARY_DIR}/stage
       COMMENT "Running windeployqt, staging Qt deps, and copying QML files"
       VERBATIM)

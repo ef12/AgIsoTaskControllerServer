@@ -873,7 +873,7 @@ namespace agisotc
 		{
 			rows.push_back({ 0, "No DDOP received from this client yet." });
 			rows.push_back({ 0, "It appears here automatically once the client uploads its pool," });
-			rows.push_back({ 0, "or load a pool file manually with the button below." });
+			rows.push_back({ 0, "or load a pool file manually with the upload button above." });
 		}
 		else
 		{

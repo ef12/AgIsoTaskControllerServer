@@ -8,6 +8,8 @@
 #include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickStyle>
+#include <QQuickWindow>
 #include <QUrl>
 #include <QVariantMap>
 #include <QtQml/qqml.h>
@@ -56,8 +58,14 @@ int main(int argc, char *argv[])
 	app.setWindowIcon(QIcon(QStringLiteral(":/icons/logo.ico")));
 	const QVariantMap startupOptions = parse_startup_options(app);
 
+	// The GUI draws all its controls itself (qml/components) on top of the Basic style, and
+	// renders text like the platform does, so small text stays crisp.
+	QQuickStyle::setStyle(QStringLiteral("Basic"));
+	QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
+
 	agisotc::TcBridge bridge;
 	qmlRegisterType<agisotc::GridGeometry>("AgIsoTc", 1, 0, "GridGeometry");
+	qmlRegisterSingletonType(QUrl(QStringLiteral("qrc:/qml/theme/Theme.qml")), "AgIsoTc", 1, 0, "Theme");
 
 	QQmlApplicationEngine engine;
 	engine.rootContext()->setContextProperty("startupOptions", startupOptions);

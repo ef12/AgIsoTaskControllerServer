@@ -1,5 +1,6 @@
 import QtQuick
-import QtQuick.Controls
+import AgIsoTc 1.0
+import "components"
 
 // Top-down 2D field map. All coordinates are bridge local meters:
 // x = east, z = -north (north is up on screen). Heading/course is
@@ -81,18 +82,27 @@ Item {
         onPaint: {
             var ctx = getContext("2d");
             var w = width, h = height;
-            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = Theme.mapBg.toString();
+            ctx.fillRect(0, 0, w, h);
 
-            // Background grid (10 m spacing)
-            ctx.strokeStyle = "#242b34";
-            ctx.lineWidth = 1;
+            // Background grid: 10 m, with a stronger line every 50 m (50 m and 250 m when zoomed out)
             var step = 10 * root.scale;
             if (step < 8) step = 50 * root.scale;
+            var major = step * 5;
             var ox = (w / 2 - root.viewX * root.scale) % step;
             var oy = (h / 2 - root.viewZ * root.scale) % step;
+            ctx.strokeStyle = Theme.mapGrid.toString();
+            ctx.lineWidth = 1;
             ctx.beginPath();
             for (var gx = ox; gx < w; gx += step) { ctx.moveTo(gx, 0); ctx.lineTo(gx, h); }
             for (var gy = oy; gy < h; gy += step) { ctx.moveTo(0, gy); ctx.lineTo(w, gy); }
+            ctx.stroke();
+            var mx = (w / 2 - root.viewX * root.scale) % major;
+            var my = (h / 2 - root.viewZ * root.scale) % major;
+            ctx.strokeStyle = Theme.mapGridMajor.toString();
+            ctx.beginPath();
+            for (var mgx = mx; mgx < w; mgx += major) { ctx.moveTo(mgx, 0); ctx.lineTo(mgx, h); }
+            for (var mgy = my; mgy < h; mgy += major) { ctx.moveTo(0, mgy); ctx.lineTo(w, mgy); }
             ctx.stroke();
 
             // Field boundary polygon
@@ -107,9 +117,10 @@ Item {
                     else { ctx.lineTo(sx, sy); }
                 }
                 ctx.closePath();
-                ctx.fillStyle = bridge.boundaryRecording ? "rgba(242, 211, 60, 0.08)" : "rgba(53, 199, 89, 0.08)";
+                var edge = bridge.boundaryRecording ? Theme.recording : Theme.accent;
+                ctx.fillStyle = Theme.alpha(edge, 0.08).toString();
                 ctx.fill();
-                ctx.strokeStyle = bridge.boundaryRecording ? "#f2d33c" : "#35c759";
+                ctx.strokeStyle = edge.toString();
                 ctx.lineWidth = 2;
                 ctx.stroke();
             }
@@ -125,16 +136,16 @@ Item {
                 }
                 if (root.draftPoints.length >= 3)
                     ctx.closePath();
-                ctx.fillStyle = "rgba(115, 199, 255, 0.08)";
-                ctx.strokeStyle = "#73c7ff";
+                ctx.fillStyle = Theme.alpha(Theme.info, 0.1).toString();
+                ctx.strokeStyle = Theme.info.toString();
                 ctx.lineWidth = 2;
                 if (root.draftPoints.length >= 3) ctx.fill();
                 ctx.stroke();
                 for (var hp = 0; hp < root.draftPoints.length; ++hp) {
                     var handle = root.draftPoints[hp];
                     var hx = root.toScreenX(handle.x), hy = root.toScreenZ(handle.z);
-                    ctx.fillStyle = hp === root.selectedDraftPoint ? "#f2d33c" : "#dce8f5";
-                    ctx.strokeStyle = "#0d1117";
+                    ctx.fillStyle = hp === root.selectedDraftPoint ? Theme.warning.toString() : "#ffffff";
+                    ctx.strokeStyle = Theme.info.toString();
                     ctx.lineWidth = 2;
                     ctx.beginPath();
                     ctx.arc(hx, hy, hp === root.selectedDraftPoint ? 7 : 5, 0, Math.PI * 2);
@@ -146,7 +157,7 @@ Item {
             // TC coverage: the ground each section applied, one patch per straight stretch
             var patches = bridge.coveragePatches;
             if (patches && patches.length > 0) {
-                ctx.fillStyle = "rgba(53, 199, 89, 0.55)";
+                ctx.fillStyle = Theme.alpha(Theme.coverage, 0.6).toString();
                 for (var k = 0; k < patches.length; ++k) {
                     var cp = patches[k];
                     var px = root.toScreenX(cp.x), py = root.toScreenZ(cp.z);
@@ -169,15 +180,15 @@ Item {
                 ctx.translate(ix, iy);
                 ctx.rotate(bridge.implementCourse * Math.PI / 180);
                 var il = 6 * root.scale, iw = 3 * root.scale;
-                ctx.fillStyle = "#8a5a1e";
-                ctx.strokeStyle = "#f0a832";
+                ctx.fillStyle = "#3a4149";
+                ctx.strokeStyle = "#9aa3ad";
                 ctx.lineWidth = 1.5;
                 ctx.beginPath();
                 ctx.rect(-iw / 2, -il / 2, iw, il);
                 ctx.fill();
                 ctx.stroke();
                 // Hitch bar toward tractor
-                ctx.strokeStyle = "#c7d0dc";
+                ctx.strokeStyle = "#9aa3ad";
                 ctx.beginPath();
                 ctx.moveTo(0, -il / 2);
                 ctx.lineTo(0, -il / 2 - 2.8 * root.scale);
@@ -194,18 +205,18 @@ Item {
                 var rearWheel = 0.9 * root.scale;
                 var frontWheel = 0.62 * root.scale;
 
-                ctx.fillStyle = "#237a34";
-                ctx.strokeStyle = "#dce8f5";
+                ctx.fillStyle = "#c9631a";
+                ctx.strokeStyle = "#1a1d21";
                 ctx.lineWidth = 1.2;
                 ctx.fillRect(-tractorWidth * 0.38, -tractorLength * 0.42, tractorWidth * 0.76, tractorLength * 0.82);
                 ctx.strokeRect(-tractorWidth * 0.38, -tractorLength * 0.42, tractorWidth * 0.76, tractorLength * 0.82);
-                ctx.fillStyle = "#2f9d45";
+                ctx.fillStyle = "#ec7a1e";
                 ctx.fillRect(-tractorWidth * 0.27, -tractorLength * 0.58, tractorWidth * 0.54, tractorLength * 0.34);
-                ctx.fillStyle = "#8dd9ff";
+                ctx.fillStyle = "#a9d4ee";
                 ctx.globalAlpha = 0.82;
                 ctx.fillRect(-tractorWidth * 0.31, tractorLength * 0.05, tractorWidth * 0.62, tractorLength * 0.27);
                 ctx.globalAlpha = 1.0;
-                ctx.fillStyle = "#e6d74a";
+                ctx.fillStyle = "#f4f6f8";
                 ctx.fillRect(-tractorWidth * 0.2, -tractorLength * 0.67, tractorWidth * 0.4, tractorLength * 0.08);
 
                 function wheel(x, y, w, h, steer) {
@@ -214,7 +225,7 @@ Item {
                     ctx.rotate(steer * Math.PI / 180);
                     ctx.fillStyle = "#111417";
                     ctx.fillRect(-w / 2, -h / 2, w, h);
-                    ctx.fillStyle = "#f0c33c";
+                    ctx.fillStyle = "#9aa3ad";
                     ctx.fillRect(-w * 0.22, -h * 0.22, w * 0.44, h * 0.44);
                     ctx.restore();
                 }
@@ -227,7 +238,7 @@ Item {
 
             // Center crosshair when not following
             if (!root.follow) {
-                ctx.strokeStyle = "#59636f";
+                ctx.strokeStyle = Theme.textMuted.toString();
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.moveTo(w / 2 - 8, h / 2); ctx.lineTo(w / 2 + 8, h / 2);
@@ -310,25 +321,40 @@ Item {
         }
     }
 
-    // Zoom controls
-    Column {
+    // Zoom and follow
+    GlassPanel {
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.margins: 8
-        spacing: 6
-        Button {
-            text: "+"; width: 36; height: 36
-            onClicked: root.scale = Math.min(30, root.scale * 1.25)
-        }
-        Button {
-            text: "−"; width: 36; height: 36
-            onClicked: root.scale = Math.max(0.5, root.scale / 1.25)
-        }
-        Button {
-            text: "◎"; width: 36; height: 36
-            checkable: true
-            checked: root.follow
-            onClicked: root.follow = !root.follow
+        anchors.margins: 12
+        width: 44
+        height: zoomTools.implicitHeight + 8
+
+        Column {
+            id: zoomTools
+            anchors.centerIn: parent
+            spacing: 2
+            AppButton {
+                variant: "ghost"
+                iconName: "plus"
+                focusPolicy: Qt.NoFocus
+                tip: "Zoom in"
+                onClicked: { root.scale = Math.min(30, root.scale * 1.25); root.repaint() }
+            }
+            AppButton {
+                variant: "ghost"
+                iconName: "minus"
+                focusPolicy: Qt.NoFocus
+                tip: "Zoom out"
+                onClicked: { root.scale = Math.max(0.5, root.scale / 1.25); root.repaint() }
+            }
+            AppButton {
+                variant: "ghost"
+                iconName: "navigation"
+                focusPolicy: Qt.NoFocus
+                active: root.follow
+                tip: root.follow ? "Following the tractor — click to pan freely" : "Follow the tractor"
+                onClicked: root.follow = !root.follow
+            }
         }
     }
 }

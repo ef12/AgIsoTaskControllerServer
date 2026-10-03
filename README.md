@@ -12,10 +12,17 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
 
 ## Features (v1 — monitor + control core)
 
-- TC clients and DDOP panel: the client roster (source address, NAME, DDOP size,
-  active/timeout state, TC version, status bits) on top, the devices heard on the bus
-  folded into one line, and below them the selected client's DDOP: its parsed
-  device/element/process-data/property tree, its declared DDIs and the pool actions
+- Interface: a dark and a light theme (switch at the bottom of the navigation rail),
+  a header with the server and task state and their start/stop buttons, a navigation
+  rail with four pages (Connect, Implements, GPS, Fields) in a resizable side panel,
+  the 3D view, and the Task Controller data docked under it. The layout, the theme
+  and the connection settings are remembered between sessions.
+- Implements page: a card per TC client (source address, function, manufacturer,
+  DDOP size, TC version, pool and timeout state, NAME), and the selected client's
+  DDOP as an object inspector (DVC, DET, DPD, DPT and DVP objects in their tree), its
+  declared DDIs with their live values, and the pool actions
+- Connect page: the CAN interface, what the TC offers, and the devices heard on the
+  bus, connected to this TC or not
 - Live process-data table with per-(client, DDI, element) tracking
 - Task start/stop (task-totals-active status bit)
 - TC-BAS: requests the client's default process data when its pool is active and
@@ -34,11 +41,17 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
   and the front wheels steer. A ground grid marks every 10 m and 50 m. The vehicles
   are built from Qt Quick 3D primitives (`qml/TractorModel.qml`,
   `qml/ImplementTrailer.qml`, `qml/WheelModel.qml`), so no model files are needed.
-- Section LED bars (TC-SC tab and the map window): one bar per boom, drawn to scale
-  and where the boom is across the implement, so a 31-row seeding boom shows 31
-  narrow LEDs and a 2-section fertilizer boom 2 wide ones
-- Task Controller data tabs: TC-Basic, TC-SC, raw process data, DDI traffic and the
-  event log; TC identify banner
+  Over the view float the implement, the section bar, the camera tools (follow,
+  fit field, zoom, reset, field map), the speed, heading, worked area and sections
+  on, and for the simulated GPS a drive pad (steering wheel, set speed, stop).
+- Section LED bars (the 3D view, the TC-SC tab and the map window): one bar per boom,
+  drawn to scale and where the boom is across the implement, so a 31-row seeding boom
+  shows 31 narrow LEDs and a 2-section fertilizer boom 2 wide ones
+- Task Controller data: TC-Basic, TC-SC, raw process data, DDI traffic and the event
+  log, docked under the 3D view (it folds down to its tabs) or in a window of its own.
+  DDI traffic and the log follow the newest line; TC identify notice
+- Field map window: the field, its boundary and the coverage in 2D, with tools to draw
+  a field boundary
 - CAN drivers: WCAN shared-memory bus (Windows, cross-process), PCAN-USB
   (Windows), PEAK PCAN Virtual via CAN-API 2 (Windows, cross-process),
   process-local virtual CAN (tests), and SocketCAN (Linux)
@@ -81,13 +94,13 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
   properties or as process data values, which the server requests.
 - **Capacity.** The server logs when a client reports more booms, sections or
   channels than the TC offers, since a client then holds back what exceeds it.
-- TODO: forward the CAN stack logger into the GUI log; persistent settings.
+- TODO: forward the CAN stack logger into the GUI log.
 
 ## Build
 
 Requires CMake 3.21+, a C++17 compiler, and Qt 6.5+ (`Core`, `Quick`,
-`Quick3D`, `QuickTimeline`, `ShaderTools`, and `Qml`). CI builds Windows /
-Linux / macOS automatically.
+`QuickControls2`, `Quick3D`, `QuickTimeline`, `ShaderTools`, and `Qml`). CI builds
+Windows / Linux / macOS automatically.
 
 ```bash
 git clone https://github.com/ef12/AgIsoTaskControllerServer.git
@@ -137,9 +150,9 @@ the GUI (`-DAGISOTC_BUILD_GUI=OFF` skips the Qt requirement).
 
 ## Usage
 
-1. Pick a driver. On Windows, `wcan` plus a shared bus name (for example
-   `big_planter_isobus`) connects separate applications without CAN hardware;
-   every application must use the same bus name. Use `pcan_usb` for PEAK
+1. On the **Connect** page, pick a driver. On Windows, `wcan` plus a shared bus
+   name (for example `big_planter_isobus`) connects separate applications without
+   CAN hardware; every application must use the same bus name. Use `pcan_usb` for PEAK
    PCAN-USB channel 1. Use `pcan_virtual` plus a CAN-API 2 network name (1..20
    bytes, default `PCANLight_USB`) to share a PEAK PCAN Virtual network with
    AgIsoVirtualTerminal's **PEAK PCAN Virtual** option and other CAN-API 2
@@ -150,13 +163,17 @@ the GUI (`-DAGISOTC_BUILD_GUI=OFF` skips the Qt requirement).
    the same process. On Linux, use `socketcan` plus an interface such as `can0`.
 2. Set TC number, booms, sections, channels; press **Start server**. Offer at
    least what the client reports (see the Event log tab), e.g. 64 sections.
-3. Select a client, inspect its DDOP and watch live values.
-4. For section control: start GPS, create or select a field, create and start a
-   task, and drive. The TC-SC tab shows the section states and the worked area.
+3. On the **Implements** page, select a client, inspect its DDOP and watch live values.
+4. For section control: start the GPS (**GPS** page), create or select a field and
+   create and start a task (**Fields** page), and drive. With the simulated GPS, drive
+   with the drive pad in the 3D view, or click the view and use W/S for the set speed,
+   A/D to steer, C to centre the wheel and Space to stop (F follows the tractor). The
+   TC-SC tab shows the section states and the worked area.
 
 ### Command-line options
 
-The options preset the top bar, so the server can be started from a script:
+The options preset the Connect page, over the settings remembered from the last
+session, so the server can be started from a script:
 
 | Option | Meaning |
 |---|---|

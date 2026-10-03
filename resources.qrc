@@ -1,12 +1,20 @@
 <RCC>
   <qresource prefix="/">
     <file>qml/Main.qml</file>
-    <file>qml/TopBar.qml</file>
-    <file>qml/ClientPanel.qml</file>
+    <file>qml/ServerConfig.qml</file>
+    <file>qml/AppHeader.qml</file>
+    <file>qml/HeaderChip.qml</file>
+    <file>qml/NavRail.qml</file>
+    <file>qml/StatusBar.qml</file>
+    <file>qml/pages/ConnectionPage.qml</file>
+    <file>qml/pages/ImplementsPage.qml</file>
+    <file>qml/pages/GpsPage.qml</file>
+    <file>qml/pages/FieldTaskPage.qml</file>
     <file>qml/ProcessDataPanel.qml</file>
     <file>qml/ProcessDataWindow.qml</file>
     <file>qml/SectionView3D.qml</file>
-    <file>qml/OperationsPanel.qml</file>
+    <file>qml/DrivePad.qml</file>
+    <file>qml/SteeringWheel.qml</file>
     <file>qml/MapWindow.qml</file>
     <file>qml/FieldMapView.qml</file>
     <file>qml/SectionStatusPanel.qml</file>
@@ -15,6 +23,33 @@
     <file>qml/WheelModel.qml</file>
     <file>qml/TractorModel.qml</file>
     <file>qml/ImplementTrailer.qml</file>
+    <file>qml/theme/Theme.qml</file>
+    <file>qml/components/Icons.js</file>
+    <file>qml/components/Icon.qml</file>
+    <file>qml/components/AppButton.qml</file>
+    <file>qml/components/AppComboBox.qml</file>
+    <file>qml/components/AppScrollBar.qml</file>
+    <file>qml/components/AppSlider.qml</file>
+    <file>qml/components/AppSpinBox.qml</file>
+    <file>qml/components/AppSwitch.qml</file>
+    <file>qml/components/AppTextField.qml</file>
+    <file>qml/components/AppToolTip.qml</file>
+    <file>qml/components/Card.qml</file>
+    <file>qml/components/CompassDial.qml</file>
+    <file>qml/components/CornerMask.qml</file>
+    <file>qml/components/Divider.qml</file>
+    <file>qml/components/EmptyState.qml</file>
+    <file>qml/components/FormField.qml</file>
+    <file>qml/components/GlassPanel.qml</file>
+    <file>qml/components/KeyCap.qml</file>
+    <file>qml/components/Metric.qml</file>
+    <file>qml/components/PageHeader.qml</file>
+    <file>qml/components/PulseDot.qml</file>
+    <file>qml/components/ScrollPage.qml</file>
+    <file>qml/components/SectionLabel.qml</file>
+    <file>qml/components/StatusBadge.qml</file>
+    <file>qml/components/Tabs.qml</file>
+    <file>qml/components/Toast.qml</file>
     <file alias="icons/logo.ico">doc/logo.ico</file>
   </qresource>
 </RCC>
