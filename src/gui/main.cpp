@@ -15,6 +15,7 @@
 #include <QtQml/qqml.h>
 
 #include "GridGeometry.hpp"
+#include "PrescriptionImage.hpp"
 #include "TcBridge.hpp"
 
 namespace
@@ -75,6 +76,8 @@ int main(int argc, char *argv[])
 	engine.rootContext()->setContextProperty("valueModel", bridge.valueModel());
 	engine.rootContext()->setContextProperty("ddiTrafficModel", bridge.ddiTrafficModel());
 	engine.rootContext()->setContextProperty("logModel", bridge.logModel());
+	// The engine owns the provider; the image itself is shared with the bridge.
+	engine.addImageProvider(QStringLiteral("prescription"), new agisotc::PrescriptionImageProvider(bridge.prescriptionImageSlot()));
 
 	engine.load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
 	if (engine.rootObjects().isEmpty())

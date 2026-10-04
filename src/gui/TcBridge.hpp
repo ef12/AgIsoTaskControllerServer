@@ -14,6 +14,7 @@
 #include <memory>
 #include <set>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 #include <QObject>
@@ -28,6 +29,9 @@
 #include "CoverageMap.hpp"
 #include "FieldTaskManager.hpp"
 #include "GpsProvider.hpp"
+#include "PrescriptionImage.hpp"
+#include "PrescriptionMap.hpp"
+#include "RatePlan.hpp"
 #include "SectionController.hpp"
 #include "SectionPlanner.hpp"
 #include "StackLog.hpp"
@@ -79,7 +83,23 @@ namespace agisotc
 		Q_PROPERTY(VariantListModel *boomLedModel READ boomLedModel CONSTANT)
 		Q_PROPERTY(bool autoSectionControl READ autoSectionControl NOTIFY sectionControlChanged)
 		Q_PROPERTY(QString sectionControlStatus READ sectionControlStatus NOTIFY sectionControlChanged)
-		Q_PROPERTY(QVariantList rateSetpoints READ rateSetpoints NOTIFY sectionControlChanged)
+		/// TC-GEO position-based control of the selected client, per control channel (a device
+		/// element with a Prescription Control State): index, element, name, hasState, and groups,
+		/// one per DDI and bin, each with its source (0 off, 1 the fixed rate, 2 + n layer n of the
+		/// prescription), its channel-level target (top) and the sub-boom or section targets of a
+		/// multi-rate device (subs). Changes only with the plan or a choice; values: rateLive.
+		Q_PROPERTY(QVariantList rateChannels READ rateChannels NOTIFY rateControlChanged)
+		/// The live values, refreshed four times a second: "c<channel>" engaged, state, latencyMs,
+		/// practice; "t<target>" commanded, wanted, actual, source.
+		Q_PROPERTY(QVariantMap rateLive READ rateLive NOTIFY rateLiveChanged)
+		Q_PROPERTY(QString rateControlStatus READ rateControlStatus NOTIFY rateControlChanged)
+		/// The selected task's prescription: present, name, description, layers, selectedLayer,
+		/// legend, and its image for the views (imageUrl, centreX, centreZ, width, height in local
+		/// metres).
+		Q_PROPERTY(QVariantMap prescription READ prescription NOTIFY prescriptionChanged)
+		/// One row per rate target, where the TC looks the rate up in the map (ahead of the
+		/// element by its setpoint latency): x, z, width, colour, label.
+		Q_PROPERTY(VariantListModel *rateMarkerModel READ rateMarkerModel CONSTANT)
 		Q_PROPERTY(QVariantList fieldBoundaryPoints READ fieldBoundaryPoints NOTIFY boundaryChanged)
 		Q_PROPERTY(bool boundaryRecording READ boundaryRecording NOTIFY boundaryChanged)
 		Q_PROPERTY(int boundaryPointCount READ boundaryPointCount NOTIFY boundaryChanged)
@@ -150,7 +170,13 @@ namespace agisotc
 		VariantListModel *boomLedModel();
 		bool autoSectionControl() const;
 		QString sectionControlStatus() const;
-		QVariantList rateSetpoints() const;
+		QVariantList rateChannels() const;
+		QVariantMap rateLive() const;
+		QString rateControlStatus() const;
+		QVariantMap prescription() const;
+		VariantListModel *rateMarkerModel();
+		/// @brief Where the prescription image goes, for the QML image provider.
+		std::shared_ptr<PrescriptionImageSlot> prescriptionImageSlot() const;
 		QVariantList fieldBoundaryPoints() const;
 		bool boundaryRecording() const;
 		int boundaryPointCount() const;
@@ -232,9 +258,23 @@ namespace agisotc
 		Q_INVOKABLE void clearWorkedArea();
 		/// @brief Lets the TC switch the client's sections while a task is active (TC-SC).
 		Q_INVOKABLE void setAutoSectionControl(bool enabled);
-		/// @brief Rate the TC commands for one of the client's rate setpoints while a task is
-		/// active, in the DDOP's raw unit (0 sends nothing).
-		Q_INVOKABLE void setRateTarget(int index, int value);
+		/// @brief Where a rate group's setpoint comes from while a task is active: 0 nowhere (off),
+		/// 1 its fixed rate, 2 + n layer n of the task's prescription (variable rate).
+		Q_INVOKABLE void setRateGroupSource(int group, int source);
+		/// @brief The fixed rate of a rate group, in the DDOP's raw unit.
+		Q_INVOKABLE void setRateGroupFixed(int group, int value);
+		/// @brief Imports the tasks of an ISO 11783-10 TASKDATA.XML with their prescriptions, and
+		/// the partfields they are on as fields.
+		Q_INVOKABLE void importTaskData(const QUrl &fileUrl);
+		/// @brief Adds a generated layer to the selected task's prescription, a grid over its field.
+		/// @param[in] pattern 0 checkerboard, 1 stripes (across the implement), 2 bands (along the
+		/// driving direction), 3 gradient from west to east.
+		Q_INVOKABLE bool createTestPrescription(int ddi, int pattern, int rateA, int rateB, double cellSizeM, double patternSizeM);
+		/// @brief Adds a treatment zone drawn on the map (local metres) to the selected task's prescription.
+		Q_INVOKABLE bool addRateZone(const QVariantList &points, int ddi, int value);
+		Q_INVOKABLE void clearPrescription();
+		/// @brief The layer the views show.
+		Q_INVOKABLE void selectPrescriptionLayer(int index);
 
 	signals:
 		void runningChanged();
@@ -259,6 +299,9 @@ namespace agisotc
 		void drivingControlsChanged();
 		void implementLoadingChanged();
 		void implementReadyChanged();
+		void rateControlChanged();
+		void rateLiveChanged();
+		void prescriptionChanged();
 		void identifyBanner(int tcNumber);
 
 	private:
@@ -322,7 +365,6 @@ namespace agisotc
 		void sendTcCommands(const std::vector<TcCommand> &commands);
 		/// @brief Engages section control while a task is active and sends the wanted states.
 		void serviceSectionControl(std::uint64_t nowMs);
-		void serviceRateControl(std::uint64_t nowMs);
 		std::vector<SectionPose> sectionPoses() const;
 		std::vector<bool> wantedSectionStates(const std::vector<SectionPose> &poses, std::uint64_t nowMs) const;
 		/// @brief Rebuilds the implement lists for the views; poll() does it at most every
@@ -338,6 +380,35 @@ namespace agisotc
 		std::array<double, 2> elementOffset(const ImplementElementState &element) const;
 		void extendCoveragePatch(std::size_t section, GroundPoint from, GroundPoint to, double widthM);
 		void publishCoverage(bool force);
+		/// @brief The connector's offset from the device reference point: the implement's hitch.
+		std::array<double, 2> connectorOffset() const;
+		/// @brief Where an element offset (ISO axes, metres) lies on the ground now.
+		GroundPoint implementGround(const std::array<double, 2> &offset, const std::array<double, 2> &connector) const;
+
+		// --- TC-GEO: variable rate and multi-rate control (TcBridgeRateControl.cpp) ---
+
+		/// @brief Builds the rate plan from the selected client's pool and the DDIs of the
+		/// selected task's prescription.
+		/// @param[in] keepWhenSame Keeps the engaged channels when the plan stays the same (a new
+		/// prescription); otherwise they are released first (the client activated its pool again).
+		void setupRatePlan(isobus::DeviceDescriptorObjectPool *pool, bool keepWhenSame);
+		/// @brief Engages the channels whose groups have a source while a task is active, and
+		/// sends each target its rate: the fixed one, or the map's at its position.
+		void serviceRateControl(std::uint64_t nowMs);
+		/// @brief The source of a group now: 0 off, 1 fixed, 2 + n layer n.
+		int rateGroupSource(std::size_t group) const;
+		/// @brief The prescription layer for a group: same DDI, practice and instance.
+		std::optional<std::size_t> matchedLayer(std::size_t group) const;
+		std::optional<std::int32_t> receivedValue(std::uint16_t element, std::uint16_t ddi) const;
+		void publishRateChannels(std::uint64_t nowMs, bool force);
+		const Prescription *selectedPrescription() const;
+		/// @brief The selected task's prescription, made when it has none; nullptr without a task.
+		Prescription *editablePrescription();
+		/// @brief After the selected task or its prescription changed: the views and the rate plan.
+		void refreshPrescription(bool rebuildPlan);
+		void renderPrescription();
+		GeoPoint localToGeo(GroundPoint point) const;
+		GroundPoint geoToLocal(GeoPoint point) const;
 
 		CanBusManager canBus;
 		GpsProvider gpsProvider;
@@ -492,10 +563,32 @@ namespace agisotc
 		int supportedChannels = 0;
 		bool autoSectionControlEnabled = true;
 		QString currentSectionControlStatus = "No client";
-		std::vector<int> rateTargets; ///< Per plan rate setpoint, raw DDOP unit, 0 = not commanded.
-		std::vector<int> lastRateSent;
-		bool rateControlEngaged = false;
-		std::uint64_t lastRateSentMs = 0;
+
+		// TC-GEO rate control state, for the client in planClient.
+		RateController rateController;
+		struct RateGroupChoice
+		{
+			int source = -1; ///< -1 automatic: the matching prescription layer, else off.
+			int fixedValue = 0;
+		};
+		/// By channel element, DDI and bin (-1 without), so a choice outlives a reconnect.
+		std::map<std::tuple<std::uint16_t, std::uint16_t, int>, RateGroupChoice> rateGroupChoices;
+		std::vector<std::optional<std::int32_t>> rateWanted; ///< Per target, from its source now.
+		std::vector<PrescriptionSource> rateWantedSource;
+		std::vector<GroundPoint> rateTargetPoints; ///< Where each target looks the map up.
+		std::vector<GroundPoint> rateTargetLast;
+		std::vector<GroundPoint> rateTargetVelocity;
+		std::uint64_t lastRateMotionMs = 0;
+		QVariantList currentRateChannels;
+		QVariantMap currentRateLive;
+		QString currentRateControlStatus = "No client";
+		std::uint64_t lastRatePublishMs = 0;
+		std::map<std::string, Prescription> taskPrescriptions; ///< By task id.
+		int currentPrescriptionLayer = 0;
+		QVariantMap currentPrescription;
+		int prescriptionImageSerial = 0;
+		std::shared_ptr<PrescriptionImageSlot> prescriptionImages = std::make_shared<PrescriptionImageSlot>();
+		VariantListModel rateMarkerRows{ QStringList{ "x", "z", "width", "colour", "label" } };
 
 		// Coverage: a grid for section control and area, and patches for the map views.
 		struct CoveragePatch

@@ -4,9 +4,9 @@ import QtQuick.Layouts
 import AgIsoTc 1.0
 import "components"
 
-// The Task Controller data: TC-Basic values, TC-SC (section control, coverage, rate control),
-// raw process data, DDI traffic and the event log. Docked under the 3D view, where it folds
-// down to its tab row, or shown in a window of its own (detached).
+// The Task Controller data: TC-Basic values, TC-SC (section control, coverage), TC-GEO (variable
+// and multi-rate control), raw process data, DDI traffic and the event log. Docked under the 3D
+// view, where it folds down to its tab row, or shown in a window of its own (detached).
 Rectangle {
     id: root
 
@@ -142,6 +142,7 @@ Rectangle {
                     model: [
                         { "text": "TC-Basic", "icon": "gauge", "count": bridge.tcBasicData.length > 0 ? bridge.tcBasicData.length : undefined },
                         { "text": "TC-SC", "icon": "grid" },
+                        { "text": "TC-GEO", "icon": "layers", "count": bridge.rateChannels.length > 0 ? bridge.rateChannels.length : undefined },
                         { "text": "Process data", "icon": "list" },
                         { "text": "DDI traffic", "icon": "activity" },
                         { "text": "Event log", "icon": "terminal" }
@@ -161,7 +162,7 @@ Rectangle {
                     onClicked: bridge.clearWorkedArea()
                 }
                 AppSwitch {
-                    visible: tabs.currentIndex === 3 && !root.collapsed
+                    visible: tabs.currentIndex === 4 && !root.collapsed
                     text: "Live watch"
                     font.pixelSize: Theme.fontSmall
                     checked: bridge.liveDdiTrafficWatch
@@ -172,12 +173,12 @@ Rectangle {
                     }
                 }
                 AppButton {
-                    visible: (tabs.currentIndex === 3 || tabs.currentIndex === 4) && !root.collapsed
+                    visible: (tabs.currentIndex === 4 || tabs.currentIndex === 5) && !root.collapsed
                     variant: "ghost"
                     size: "sm"
                     text: "Clear"
                     iconName: "trash"
-                    onClicked: tabs.currentIndex === 3 ? bridge.clearDdiTraffic() : bridge.clearLog()
+                    onClicked: tabs.currentIndex === 4 ? bridge.clearDdiTraffic() : bridge.clearLog()
                 }
 
                 Rectangle {
@@ -413,62 +414,10 @@ Rectangle {
                     }
                 }
 
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    SectionLabel { text: "Rate control" }
-                    Text {
-                        visible: bridge.rateSetpoints.length === 0
-                        text: "The client's DDOP offers no rate setpoints."
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSmall
-                        color: Theme.textMuted
-                    }
-                    Repeater {
-                        model: bridge.rateSetpoints
-                        delegate: Rectangle {
-                            Layout.fillWidth: true
-                            implicitHeight: 48
-                            radius: Theme.radiusMd
-                            color: Theme.surfaceAlt
-                            border.color: Theme.border
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 8
-                                spacing: 12
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 0
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: modelData.name !== "" ? modelData.name : "Rate setpoint"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontBody
-                                        font.weight: Font.DemiBold
-                                        color: Theme.text
-                                        elide: Text.ElideRight
-                                    }
-                                    Text {
-                                        text: "DDI " + modelData.ddi + " · element " + modelData.element + " · raw DDOP unit, 0 sends nothing"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontCaption
-                                        color: Theme.textMuted
-                                    }
-                                }
-                                AppSpinBox {
-                                    Layout.preferredWidth: 170
-                                    from: 0
-                                    to: 2000000000
-                                    value: modelData.target
-                                    onValueModified: bridge.setRateTarget(index, value)
-                                }
-                            }
-                        }
-                    }
-                }
             }
+
+            // --- TC-GEO ----------------------------------------------------------------------
+            RateControlPanel { }
 
             // --- raw process data ------------------------------------------------------------
             ColumnLayout {

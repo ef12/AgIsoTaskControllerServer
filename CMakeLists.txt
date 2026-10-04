@@ -25,7 +25,7 @@ FetchContent_Declare(
   GIT_TAG 9a320161189c2015a762c5f81dd346f4c167905f)
 FetchContent_MakeAvailable(CAN_STACK)
 
-# Core library: TC server wrapper + CAN setup + GPS + Field/Task + FieldTracker. No Qt dependency.
+# Core library: TC server wrapper + CAN setup + GPS + Field/Task + FieldTracker + TC-GEO rate control. No Qt dependency.
 add_library(tcserver_core STATIC
   src/core/TcServerCore.cpp
   src/core/CanBusManager.cpp
@@ -40,6 +40,9 @@ add_library(tcserver_core STATIC
   src/core/SectionPlanner.cpp
   src/core/CoverageMap.cpp
   src/core/ConnectionProgress.cpp
+  src/core/PrescriptionMap.cpp
+  src/core/IsoXmlTaskData.cpp
+  src/core/RatePlan.cpp
   src/core/StackLog.cpp)
 if("WindowsCANAPI2" IN_LIST CAN_DRIVER)
   target_sources(tcserver_core PRIVATE src/core/PcanVirtualNetwork.cpp)
@@ -63,6 +66,9 @@ if(AGISOTC_BUILD_TESTS)
   add_executable(connection_progress_tests tests/connection_progress_tests.cpp)
   target_link_libraries(connection_progress_tests PRIVATE tcserver_core)
   add_test(NAME connection_progress COMMAND connection_progress_tests)
+  add_executable(rate_control_tests tests/rate_control_tests.cpp)
+  target_link_libraries(rate_control_tests PRIVATE tcserver_core)
+  add_test(NAME rate_control COMMAND rate_control_tests)
 endif()
 
 if(AGISOTC_BUILD_GUI)
@@ -73,6 +79,9 @@ if(AGISOTC_BUILD_GUI)
   qt_add_executable(AgIsoTaskControllerServer
     src/gui/main.cpp
     src/gui/TcBridge.cpp
+    src/gui/TcBridgeRateControl.cpp
+    src/gui/PrescriptionImage.cpp
+    src/gui/PrescriptionJson.cpp
     src/gui/TcModels.cpp
     src/gui/GridGeometry.cpp
     resources.qrc)

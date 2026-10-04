@@ -236,6 +236,31 @@ FocusScope {
             }
         }
 
+        // The selected task's prescription map (TC-GEO), on the field under the grid lines and
+        // the coverage. The bridge renders the shown layer; row 0 of the image is its north edge.
+        Model {
+            visible: (bridge.prescription.imageUrl || "") !== ""
+            source: "#Rectangle"
+            position: Qt.vector3d(bridge.prescription.centreX || 0, -0.04, bridge.prescription.centreZ || 0)
+            eulerRotation.x: -90
+            scale: Qt.vector3d(Math.max(0.001, (bridge.prescription.width || 0) / 100),
+                               Math.max(0.001, (bridge.prescription.height || 0) / 100), 1)
+            materials: PrincipledMaterial {
+                lighting: PrincipledMaterial.NoLighting
+                alphaMode: PrincipledMaterial.Blend
+                opacity: 0.85
+                baseColorMap: Texture {
+                    minFilter: Texture.Nearest
+                    magFilter: Texture.Nearest
+                    sourceItem: Image {
+                        source: bridge.prescription.imageUrl || ""
+                        smooth: false
+                        cache: false
+                    }
+                }
+            }
+        }
+
         // Ground grid over the ground and the field: a fine line every 10 m and a
         // stronger one every 50 m, on the world origin, so the field's edges lie on it.
         Repeater3D {
@@ -279,6 +304,24 @@ FocusScope {
                     scale: Qt.vector3d(Math.max(0.002, model.width / 100), 0.0008,
                                        Math.max(0.002, model.length / 100))
                     materials: PrincipledMaterial { baseColor: Theme.coverage; opacity: 0.75; roughness: 1.0 }
+                }
+            }
+        }
+
+        Node {
+            // TC-GEO: where each rate controller looks its rate up in the map (ahead of it by its
+            // setpoint latency), as wide as it is, in the colour of the rate it gets.
+            Repeater3D {
+                model: bridge.rateMarkerModel
+                delegate: Model {
+                    source: "#Cube"
+                    position: Qt.vector3d(model.x, 0.15, model.z)
+                    eulerRotation.y: -bridge.implementCourse
+                    scale: Qt.vector3d(Math.max(0.004, model.width * 0.92 / 100), 0.002, 0.006)
+                    materials: PrincipledMaterial {
+                        lighting: PrincipledMaterial.NoLighting
+                        baseColor: model.colour
+                    }
                 }
             }
         }

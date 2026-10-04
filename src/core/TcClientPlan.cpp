@@ -17,21 +17,6 @@ namespace agisotc
 
 		constexpr std::uint16_t CONDENSED_GROUPS = 16; ///< 16 condensed DDIs of 16 sections each
 
-		/// DDIs of the application rate setpoints a TC can command.
-		constexpr DDI RATE_SETPOINT_DDIS[] = {
-			DDI::SetpointVolumePerAreaApplicationRate,
-			DDI::SetpointMassPerAreaApplicationRate,
-			DDI::SetpointCountPerAreaApplicationRate,
-			DDI::SetpointSpacingApplicationRate,
-			DDI::SetpointVolumePerVolumeApplicationRate,
-			DDI::SetpointMassPerMassApplicationRate,
-			DDI::SetpointVolumePerMassApplicationRate,
-			DDI::SetpointVolumePerTimeApplicationRate,
-			DDI::SetpointMassPerTimeApplicationRate,
-			DDI::SetpointCountPerTimeApplicationRate,
-			DDI::SetpointPercentageApplicationRate,
-		};
-
 		struct ElementInfo
 		{
 			std::uint16_t number = 0;
@@ -39,12 +24,6 @@ namespace agisotc
 			DeviceElementObject::Type type = DeviceElementObject::Type::Device;
 			std::vector<std::shared_ptr<DeviceProcessDataObject>> processData;
 		};
-
-		bool is_rate_setpoint(std::uint16_t ddi)
-		{
-			return std::any_of(std::begin(RATE_SETPOINT_DDIS), std::end(RATE_SETPOINT_DDIS),
-			                   [ddi](DDI rate) { return static_cast<std::uint16_t>(rate) == ddi; });
-		}
 	} // namespace
 
 	bool is_actual_condensed_work_state(std::uint16_t ddi)
@@ -194,14 +173,6 @@ namespace agisotc
 				if ((static_cast<std::uint16_t>(DDI::SectionControlState) == ddi) && settable && !plan.sectionControlStateElement)
 				{
 					plan.sectionControlStateElement = info.number;
-				}
-				if (settable && is_rate_setpoint(ddi))
-				{
-					plan.rateSetpoints.push_back({ ddi, info.number, processData->get_designator() });
-				}
-				if ((static_cast<std::uint16_t>(DDI::PrescriptionControlState) == ddi) && settable)
-				{
-					plan.prescriptionControlStateElements.push_back(info.number);
 				}
 
 				// TC-BAS: asking for this DDI makes the client report its default data set

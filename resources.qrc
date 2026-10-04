@@ -11,6 +11,7 @@
     <file>qml/pages/GpsPage.qml</file>
     <file>qml/pages/FieldTaskPage.qml</file>
     <file>qml/ProcessDataPanel.qml</file>
+    <file>qml/RateControlPanel.qml</file>
     <file>qml/ProcessDataWindow.qml</file>
     <file>qml/SectionView3D.qml</file>
     <file>qml/ImplementLoadingCard.qml</file>

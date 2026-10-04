@@ -75,9 +75,30 @@ Item {
         }
     }
 
+    // The prescription image of the selected task: a new URL for every new rendering.
+    property string loadedPrescription: ""
+    function loadPrescription() {
+        var url = bridge.prescription.imageUrl || "";
+        if (url === loadedPrescription)
+            return;
+        if (loadedPrescription !== "")
+            mapCanvas.unloadImage(loadedPrescription);
+        loadedPrescription = url;
+        if (url !== "")
+            mapCanvas.loadImage(url);
+        mapCanvas.requestPaint();
+    }
+
+    Connections {
+        target: bridge
+        function onPrescriptionChanged() { root.loadPrescription(); }
+    }
+
     Canvas {
         id: mapCanvas
         anchors.fill: parent
+        onImageLoaded: requestPaint()
+        Component.onCompleted: root.loadPrescription()
 
         onPaint: {
             var ctx = getContext("2d");
@@ -152,6 +173,17 @@ Item {
                     ctx.fill();
                     ctx.stroke();
                 }
+            }
+
+            // The selected task's prescription map (TC-GEO), under the coverage
+            var prescription = bridge.prescription;
+            if (prescription && prescription.imageUrl && isImageLoaded(prescription.imageUrl)) {
+                ctx.globalAlpha = 0.8;
+                ctx.drawImage(prescription.imageUrl,
+                              root.toScreenX(prescription.centreX - prescription.width / 2),
+                              root.toScreenZ(prescription.centreZ - prescription.height / 2),
+                              prescription.width * root.scale, prescription.height * root.scale);
+                ctx.globalAlpha = 1.0;
             }
 
             // TC coverage: the ground each section applied, one patch per straight stretch
@@ -247,6 +279,21 @@ Item {
                 ctx.moveTo(w / 2, h / 2 - 8); ctx.lineTo(w / 2, h / 2 + 8);
                 ctx.stroke();
             }
+        }
+    }
+
+    // TC-GEO: where each rate controller looks its rate up, in the colour of its rate
+    Repeater {
+        model: bridge.rateMarkerModel
+        delegate: Rectangle {
+            x: root.toScreenX(model.x) - width / 2
+            y: root.toScreenZ(model.z) - height / 2
+            width: Math.max(4, model.width * 0.92 * root.scale)
+            height: Math.max(3, 0.6 * root.scale)
+            rotation: bridge.implementCourse
+            color: model.colour
+            border.color: "#1a1d21"
+            border.width: 1
         }
     }
 

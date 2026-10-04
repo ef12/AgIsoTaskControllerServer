@@ -121,7 +121,6 @@ namespace
 		CHECK(plan.supports_section_control());
 		CHECK(plan.section_count() == 5);
 		CHECK(plan.sectionControlStateElement && (*plan.sectionControlStateElement == 1));
-		CHECK((plan.rateSetpoints.size() == 1) && (plan.rateSetpoints[0].element == 30));
 
 		// TC-BAS default data, and on-change reports for the work states that have that trigger.
 		CHECK(contains(plan.setupCommands, { TcCommand::Kind::RequestValue, ddi(DDI::RequestDefaultProcessData), 0, 0 }));

@@ -24,6 +24,8 @@
 #include "isobus/isobus/isobus_task_controller_client_objects.hpp"
 #include "isobus/isobus/isobus_standard_data_description_indices.hpp"
 
+#include "PrescriptionJson.hpp"
+
 namespace agisotc
 {
 	namespace
@@ -700,6 +702,10 @@ namespace agisotc
 		{
 			sendTcCommands(sectionController.set_engaged(false, steady_clock_ms()));
 		}
+		if (rateController.any_engaged())
+		{
+			sendTcCommands(rateController.set_engaged({}, steady_clock_ms()));
+		}
 		pumpRunning = false;
 		if (pumpThread.joinable())
 		{
@@ -719,10 +725,10 @@ namespace agisotc
 		lastDdiSyncMs = 0;
 		sectionController.reset({});
 		planClient = -1;
-		rateControlEngaged = false;
 		pendingSetupAtMs = 0;
 		currentSectionControlStatus = "No client";
 		emit sectionControlChanged();
+		setupRatePlan(nullptr, false);
 		running = false;
 		emit runningChanged();
 
@@ -823,6 +829,8 @@ namespace agisotc
 		{
 			pendingSetupAtMs = 0;
 			sendSetupCommands();
+			// A client may take the Prescription Control State only once it sees the task active.
+			sendTcCommands(rateController.reassert(nowMs));
 		}
 		serviceSectionControl(nowMs);
 		serviceRateControl(nowMs);
@@ -1097,6 +1105,7 @@ namespace agisotc
 			if (ddi == static_cast<std::uint16_t>(DDI::DeviceElementOffsetZ)) return 3;
 			if ((ddi == static_cast<std::uint16_t>(DDI::PhysicalObjectWidth)) ||
 			    (ddi == static_cast<std::uint16_t>(DDI::ActualWorkingWidth)) ||
+			    (ddi == static_cast<std::uint16_t>(DDI::MaximumWorkingWidth)) ||
 			    (ddi == static_cast<std::uint16_t>(DDI::DefaultWorkingWidth)) ||
 			    (ddi == static_cast<std::uint16_t>(DDI::SetpointWorkingWidth))) return 4;
 			if ((ddi == static_cast<std::uint16_t>(DDI::PhysicalObjectLength)) ||
@@ -2001,6 +2010,7 @@ namespace agisotc
 			}
 		}
 		emit tasksChanged();
+		refreshPrescription(true);
 	}
 
 	void TcBridge::startSelectedTask()
@@ -2204,6 +2214,11 @@ namespace agisotc
 				ddis.push_back(static_cast<int>(ddi));
 			}
 			object["ddIsToLog"] = ddis;
+			const auto prescription = taskPrescriptions.find(task.id);
+			if ((prescription != taskPrescriptions.end()) && !prescription->second.empty())
+			{
+				object["prescription"] = prescription_to_json(prescription->second);
+			}
 			tasks.push_back(object);
 		}
 		QJsonDocument document(QJsonObject{ { "tasks", tasks } });
@@ -2252,9 +2267,14 @@ namespace agisotc
 			}
 			// Never restore a live state; loaded tasks always start as created.
 			task.state = Task::State::Created;
-			if (!task.name.empty() && !fieldTaskManager.create_task(task).empty())
+			const std::string taskId = task.name.empty() ? std::string() : fieldTaskManager.create_task(task);
+			if (!taskId.empty())
 			{
 				++loaded;
+				if (object.contains("prescription"))
+				{
+					taskPrescriptions[taskId] = prescription_from_json(object.value("prescription").toObject());
+				}
 			}
 			else
 			{
@@ -2270,6 +2290,7 @@ namespace agisotc
 		               .arg(loaded)
 		               .arg(skipped > 0 ? QString(", %1 skipped (missing field)").arg(skipped) : QString())
 		               .arg(fileUrl.fileName()));
+		refreshPrescription(true);
 	}
 
 	bool TcBridge::startBoundaryRecording(const QString &name)
@@ -2552,21 +2573,24 @@ namespace agisotc
 		{
 			sendTcCommands(sectionController.set_engaged(false, nowMs)); // previous client back to manual
 		}
+		if (rateController.any_engaged())
+		{
+			sendTcCommands(rateController.set_engaged({}, nowMs));
+		}
 		planClient = currentSelectedClient;
 		ClientPlan plan;
+		isobus::DeviceDescriptorObjectPool pool;
+		bool parsed = false;
 		if ((nullptr != server) && (planClient >= 0))
 		{
 			const auto address = static_cast<std::uint8_t>(planClient);
-			isobus::DeviceDescriptorObjectPool pool;
 			if (0 != parse_client_pool(server->stored_pool(address), server->client_version(address), pool))
 			{
 				plan = build_client_plan(pool);
+				parsed = true;
 			}
 		}
 		sectionController.reset(plan);
-		rateTargets.assign(plan.rateSetpoints.size(), 0);
-		lastRateSent.assign(plan.rateSetpoints.size(), 0);
-		rateControlEngaged = false;
 		sectionCentresValid = false;
 
 		if (plan.supports_section_control())
@@ -2586,18 +2610,17 @@ namespace agisotc
 		{
 			currentSectionControlStatus = (planClient < 0) ? QString("No client") : QString("The client's DDOP offers no section setpoints");
 		}
-		if (!plan.rateSetpoints.empty())
-		{
-			logs.addLine(QString("[rate] Client %1 accepts %2 rate setpoint(s).").arg(planClient).arg(plan.rateSetpoints.size()));
-		}
 		emit sectionControlChanged();
+		setupRatePlan(parsed ? &pool : nullptr, false);
 		sendSetupCommands();
 	}
 
 	void TcBridge::sendSetupCommands()
 	{
 		if ((planClient < 0) || (connectedAddresses.find(static_cast<std::uint8_t>(planClient)) == connectedAddresses.end())) return;
-		const auto &commands = sectionController.plan().setupCommands;
+		auto commands = sectionController.plan().setupCommands;
+		const auto &rateSetup = rateController.plan().setupCommands;
+		commands.insert(commands.end(), rateSetup.cbegin(), rateSetup.cend());
 		if (commands.empty()) return;
 		sendTcCommands(commands);
 		const auto triggers = std::count_if(commands.cbegin(), commands.cend(), [](const TcCommand &command) {
@@ -2606,10 +2629,14 @@ namespace agisotc
 		const bool defaultData = std::any_of(commands.cbegin(), commands.cend(), [](const TcCommand &command) {
 			return command.ddi == static_cast<std::uint16_t>(isobus::DataDescriptionIndex::RequestDefaultProcessData);
 		});
-		logs.addLine(QString("[tc] Set up client %1: %2%3 on-change report(s).")
+		const auto intervals = std::count_if(commands.cbegin(), commands.cend(), [](const TcCommand &command) {
+			return TcCommand::Kind::TimeInterval == command.kind;
+		});
+		logs.addLine(QString("[tc] Set up client %1: %2%3 on-change report(s)%4.")
 		               .arg(planClient)
 		               .arg(defaultData ? "requested its default process data (TC-BAS), " : "")
-		               .arg(triggers));
+		               .arg(triggers)
+		               .arg((intervals > 0) ? QString(", %1 actual rate(s) every %2 ms").arg(intervals).arg(ACTUAL_RATE_INTERVAL_MS) : QString()));
 	}
 
 	void TcBridge::sendTcCommands(const std::vector<TcCommand> &commands)
@@ -2668,45 +2695,6 @@ namespace agisotc
 		}
 	}
 
-	void TcBridge::serviceRateControl(std::uint64_t nowMs)
-	{
-		const auto &plan = sectionController.plan();
-		const bool connected = (planClient >= 0) && (connectedAddresses.find(static_cast<std::uint8_t>(planClient)) != connectedAddresses.end());
-		const bool anyTarget = std::any_of(rateTargets.cbegin(), rateTargets.cend(), [](int target) { return target > 0; });
-		const bool engage = running && connected && taskActive && anyTarget;
-		const auto prescriptionState = static_cast<std::uint16_t>(isobus::DataDescriptionIndex::PrescriptionControlState);
-		if (engage != rateControlEngaged)
-		{
-			rateControlEngaged = engage;
-			std::vector<TcCommand> commands;
-			for (const auto element : plan.prescriptionControlStateElements)
-			{
-				commands.push_back({ TcCommand::Kind::SetValue, prescriptionState, element, engage ? 1 : 0 });
-			}
-			sendTcCommands(commands);
-			lastRateSent.assign(rateTargets.size(), 0);
-			lastRateSentMs = 0;
-			logs.addLine(engage ? QString("[rate] Rate control engaged for client %1.").arg(planClient)
-			                    : QString("[rate] Rate control released for client %1.").arg(planClient));
-		}
-		if (!rateControlEngaged) return;
-		const bool heartbeat = (nowMs - lastRateSentMs) >= 2000;
-		std::vector<TcCommand> commands;
-		for (std::size_t i = 0; (i < plan.rateSetpoints.size()) && (i < rateTargets.size()); ++i)
-		{
-			if ((rateTargets[i] > 0) && (heartbeat || (lastRateSent[i] != rateTargets[i])))
-			{
-				commands.push_back({ TcCommand::Kind::SetValue, plan.rateSetpoints[i].ddi, plan.rateSetpoints[i].element, rateTargets[i] });
-				lastRateSent[i] = rateTargets[i];
-			}
-		}
-		if (!commands.empty())
-		{
-			sendTcCommands(commands);
-			lastRateSentMs = nowMs;
-		}
-	}
-
 	std::array<double, 2> TcBridge::elementOffset(const ImplementElementState &element) const
 	{
 		std::array<double, 2> offset = { 0.0, 0.0 };
@@ -2736,30 +2724,34 @@ namespace agisotc
 		return offset;
 	}
 
-	std::vector<TcBridge::SectionPose> TcBridge::sectionPoses() const
+	std::array<double, 2> TcBridge::connectorOffset() const
 	{
-		std::vector<SectionPose> poses;
-		std::array<double, 2> connector = { 0.0, 0.0 };
 		for (const auto &element : implementElementStates)
 		{
 			if (element.type == static_cast<int>(isobus::task_controller_object::DeviceElementObject::Type::Connector))
 			{
-				connector = elementOffset(element);
-				break;
+				return elementOffset(element);
 			}
 		}
+		return { 0.0, 0.0 };
+	}
+
+	GroundPoint TcBridge::implementGround(const std::array<double, 2> &offset, const std::array<double, 2> &connector) const
+	{
 		// The implement's reference point is its hitch, where the connector sits.
 		const double heading = currentImplementCourse * DegreesToRadians;
-		const double forwardX = std::sin(heading);
-		const double forwardZ = -std::cos(heading);
-		const double rightX = std::cos(heading);
-		const double rightZ = std::sin(heading);
+		const double forward = offset[0] - connector[0];
+		const double right = offset[1] - connector[1];
+		return { currentImplementX + (std::sin(heading) * forward) + (std::cos(heading) * right),
+			     currentImplementZ - (std::cos(heading) * forward) + (std::sin(heading) * right) };
+	}
+
+	std::vector<TcBridge::SectionPose> TcBridge::sectionPoses() const
+	{
+		std::vector<SectionPose> poses;
+		const auto connector = connectorOffset();
 		auto place = [&](double offsetX, double offsetY, double widthM) {
-			const double forward = offsetX - connector[0];
-			const double right = offsetY - connector[1];
-			poses.push_back({ { currentImplementX + (forwardX * forward) + (rightX * right),
-			                    currentImplementZ + (forwardZ * forward) + (rightZ * right) },
-			                  widthM });
+			poses.push_back({ implementGround({ offsetX, offsetY }, connector), widthM });
 		};
 
 		const auto &plan = sectionController.plan();
@@ -2935,22 +2927,6 @@ namespace agisotc
 		return currentSectionControlStatus;
 	}
 
-	QVariantList TcBridge::rateSetpoints() const
-	{
-		QVariantList rows;
-		const auto &plan = sectionController.plan();
-		for (std::size_t i = 0; i < plan.rateSetpoints.size(); ++i)
-		{
-			QVariantMap row;
-			row["ddi"] = plan.rateSetpoints[i].ddi;
-			row["element"] = plan.rateSetpoints[i].element;
-			row["name"] = QString::fromStdString(plan.rateSetpoints[i].name).trimmed();
-			row["target"] = (i < rateTargets.size()) ? rateTargets[i] : 0;
-			rows.push_back(row);
-		}
-		return rows;
-	}
-
 	void TcBridge::setAutoSectionControl(bool enabled)
 	{
 		if (autoSectionControlEnabled == enabled) return;
@@ -2958,13 +2934,6 @@ namespace agisotc
 		logs.addLine(QString("[tc-sc] Automatic section control %1.").arg(enabled ? "on" : "off"));
 		emit sectionControlChanged();
 		serviceSectionControl(steady_clock_ms());
-	}
-
-	void TcBridge::setRateTarget(int index, int value)
-	{
-		if ((index < 0) || (index >= static_cast<int>(rateTargets.size()))) return;
-		rateTargets[static_cast<std::size_t>(index)] = std::max(0, value);
-		emit sectionControlChanged();
 	}
 
 	void TcBridge::updateSpeedMessages(double elapsedSeconds)
@@ -3051,6 +3020,7 @@ namespace agisotc
 			fieldOriginLatitude = *solution.latitudeDeg;
 			fieldOriginLongitude = *solution.longitudeDeg;
 			fieldOriginValid = true;
+			renderPrescription();
 		}
 		currentTractorX = (*solution.longitudeDeg - fieldOriginLongitude) * DegreesToRadians * EarthRadiusM *
 		                  std::cos(fieldOriginLatitude * DegreesToRadians);
@@ -3226,6 +3196,7 @@ namespace agisotc
 		currentActiveFieldName = QString::fromStdString(field->name);
 		clearTrack();
 		rebuildFieldBoundaryPoints();
+		renderPrescription(); // the local origin moved
 	}
 
 	void TcBridge::registerGpsCanCallbacks()

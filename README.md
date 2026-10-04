@@ -30,7 +30,18 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
 - TC-SC: switches the client to automatic section control while a task is active
   and turns each section on and off from the field boundary and the coverage,
   per boom (Setpoint Condensed Work State)
-- Rate control: commands the client's settable rate setpoints while a task is active
+- TC-GEO variable rate: a task can carry a prescription (treatment zones placed by
+  polygons or by a grid of type 1 or 2, with default, out-of-field and position-lost
+  zones). While the task is active, each rate of the client gets the map's value where
+  its device element is, sent when it changes
+- TC-GEO multi-rate: every device element with a Prescription Control State is a
+  control channel (seed and fertilizer, several bins, ...), each with its own rates; a
+  boom whose sub-booms or sections carry rates of their own gets a rate per sub-boom,
+  each looked up at its own position. A rate can also be off or fixed
+- Prescriptions come from ISO 11783-10 task data (TASKDATA.XML with its grid files: the
+  tasks, their treatment zones and the partfield boundaries), from a generated test map
+  (checkerboard, stripes, bands or gradient over the task's field), or from zones drawn
+  on the field map; they are saved with the tasks. The views show the map in colour
 - Coverage map: the ground each section applied, as the client reports it, in the
   3D view and the field map
 - 3D section-control view: each boom is an LED bar trailing the tractor, one LED per
@@ -61,7 +72,7 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
 - Section LED bars (the TC-SC tab and the map window): one bar per boom,
   drawn to scale and where the boom is across the implement, so a 31-row seeding boom
   shows 31 narrow LEDs and a 2-section fertilizer boom 2 wide ones
-- Task Controller data: TC-Basic, TC-SC, raw process data, DDI traffic and the event
+- Task Controller data: TC-Basic, TC-SC, TC-GEO, raw process data, DDI traffic and the event
   log, docked under the 3D view (it folds down to its tabs) or in a window of its own.
   DDI traffic and the log follow the newest line; TC identify notice
 - Field map window: the field, its boundary and the coverage in 2D, with tools to draw
@@ -95,10 +106,39 @@ Built on [AgIsoStack++](https://github.com/ef12/AgIsoStack-plus-plus) (`TaskCont
   section control off or stopping the server turns all sections off and sets
   the client back to manual. Set values are sent without acknowledge, which not
   every client accepts.
-- **Rate control.** Settable rate setpoints in the DDOP (volume, mass or count per
-  area, spacing, ...) are listed in the TC-SC tab. A target other than 0 is sent
-  while a task is active, after setting the Prescription Control State to
-  automatic where the client has one.
+- **TC-GEO.** AgIsoStack++ provides the bus side only: the TC-GEO options and the number
+  of position-based control channels in the version message, and the process data
+  commands. The server does the rest (ISO 11783-10 6.8.1, F.3.4):
+  - *Control channels.* A device element that references a settable Prescription Control
+    State (DDI 158) is a channel. Its settable rate setpoints (volume, mass or count per
+    area, spacing, ... and any other settable DDI a prescription holds) are grouped per
+    DDI and bin: the channel-level setpoint, and the setpoints of the sub-booms and
+    sections below the channel (a multi-rate device, F.24, F.25). Rates without a
+    Prescription Control State above them are commanded without one. The TC-GEO tab
+    lists the channels, and the server logs when a client has more than it offers.
+  - *Sources.* Per rate: off, a fixed rate, or a layer of the selected task's
+    prescription. A layer matches a rate by its DDI, and by the Actual Cultural Practice
+    (DDI 179) and Element Type Instance (DDI 178) where both give one; a matching layer
+    is used by default. A fixed rate goes to the channel-level setpoint (the device passes
+    it on to its sub-booms), a map to each sub-boom or section at its own position.
+  - *Position.* A rate is looked up where its element will be once a setpoint sent now
+    is applied: its offset from the device reference point, moved ahead along its own
+    motion by its Physical Setpoint Time Latency (DDI 142, inherited from the elements
+    above it). Within a polygon zone, else in the grid cell, else the default zone
+    applies; outside the field boundary the out-of-field zone, and without a position the
+    position-lost zone, when the task has them. Without a value the client keeps its
+    setpoint.
+  - *Commands.* When a task starts, each channel with a source gets its Prescription
+    Control State set to automatic (again after the client sees the task active), then
+    its rates: when they change (at most every 250 ms per rate) and every 2 s. The
+    client's actual rates are measured every second. Stopping the task, the source going
+    off or the server stopping sets the channels back to manual.
+  - *Task data.* TASKDATA.XML is read with its external files (XFR) and grid files (case
+    of the file names does not matter): tasks (TSK), treatment zones (TZN), process data
+    variables (PDV, with their value presentation), polygons (PLN/LSG/PNT) and the grid
+    (GRD type 1 and 2). A partfield's boundary (PLN type 1) becomes a field; a task
+    without one goes on the selected field. Peer control assignment (setpoints from
+    another control function) is not supported.
 - **Coverage** follows the section states the client reports (Actual Condensed
   Work State), or the commanded ones for a client that reports none. Worked area
   counts covered ground once, however often it is driven over.
@@ -178,7 +218,10 @@ the GUI (`-DAGISOTC_BUILD_GUI=OFF` skips the Qt requirement).
 2. Set TC number, booms, sections, channels; press **Start server**. Offer at
    least what the client reports (see the Event log tab), e.g. 64 sections.
 3. On the **Implements** page, select a client, inspect its DDOP and watch live values.
-4. For section control: start the GPS (**GPS** page), create or select a field and
+4. For variable rate: on the **Fields** page, import task data (Prescription, import
+   button) or select a task and add a test map; the TC-GEO tab shows each rate's source.
+   Start the task as for section control.
+5. For section control: start the GPS (**GPS** page), create or select a field and
    create and start a task (**Fields** page), and drive. With the simulated GPS, drive
    with the drive pad in the 3D view, or click the view and use W/S for the set speed,
    A/D to steer, C to centre the wheel and Space to stop (F follows the tractor). The

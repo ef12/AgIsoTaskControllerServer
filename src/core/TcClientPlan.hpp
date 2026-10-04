@@ -2,7 +2,7 @@
 /// @file TcClientPlan.hpp
 ///
 /// @brief What a TC server does with a client once its DDOP is active: the process data it sets
-/// up for TC-BAS, and the booms, sections and rates it controls for TC-SC and rate control.
+/// up for TC-BAS, and the booms and sections it controls for TC-SC (rates: RatePlan.hpp).
 /// Derived from the DDOP alone (ISO 11783-10), without any Qt or bus dependency.
 //================================================================================================
 #pragma once
@@ -48,14 +48,6 @@ namespace agisotc
 		std::vector<std::uint16_t> actualCondensedDdis; ///< Actual Condensed Work State DDIs present (161..176).
 	};
 
-	/// @brief A settable application rate setpoint the TC can command (rate control).
-	struct RateSetpoint
-	{
-		std::uint16_t ddi = 0;
-		std::uint16_t element = 0;
-		std::string name; ///< DDOP designator of the process data, may be empty.
-	};
-
 	/// @brief Everything the TC derives from one client's DDOP.
 	struct ClientPlan
 	{
@@ -63,10 +55,6 @@ namespace agisotc
 		/// Element with a settable Section Control State (DDI 160), which switches the client
 		/// between manual and automatic (TC) section control.
 		std::optional<std::uint16_t> sectionControlStateElement;
-		std::vector<RateSetpoint> rateSetpoints;
-		/// Elements with a settable Prescription Control State (DDI 158). A client may accept
-		/// rate setpoints only while this is automatic (1).
-		std::vector<std::uint16_t> prescriptionControlStateElements;
 		/// Commands to send once the pool is active: the TC-BAS default data request and
 		/// on-change triggers for the work states section control and coverage depend on.
 		std::vector<TcCommand> setupCommands;

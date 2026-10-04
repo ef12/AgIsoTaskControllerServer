@@ -139,6 +139,75 @@ Window {
             }
         }
 
+        // --- a rate zone of the selected task's prescription, from the drawn polygon ------------
+        GlassPanel {
+            id: zonePanel
+            visible: drawSwitch.checked && bridge.selectedTaskIndex >= 0
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.rightMargin: 68
+            anchors.topMargin: 12
+            width: zoneRow.implicitWidth + 20
+            height: 52
+
+            // the rates the client can take: "Name (DDI n)"
+            readonly property var clientRates: {
+                const rates = []
+                const seen = {}
+                for (let c = 0; c < bridge.rateChannels.length; ++c) {
+                    const groups = bridge.rateChannels[c].groups
+                    for (let g = 0; g < groups.length; ++g) {
+                        if (seen[groups[g].ddi]) continue
+                        seen[groups[g].ddi] = true
+                        rates.push({ "ddi": groups[g].ddi, "text": groups[g].name + " (DDI " + groups[g].ddi + ")" })
+                    }
+                }
+                return rates
+            }
+
+            RowLayout {
+                id: zoneRow
+                anchors.centerIn: parent
+                spacing: 8
+                AppComboBox {
+                    id: zoneRate
+                    visible: zonePanel.clientRates.length > 0
+                    Layout.preferredWidth: 190
+                    model: zonePanel.clientRates.map(function(rate) { return rate.text })
+                    focusPolicy: Qt.NoFocus
+                }
+                AppSpinBox {
+                    id: zoneDdi
+                    visible: zonePanel.clientRates.length === 0
+                    Layout.preferredWidth: 110
+                    from: 1
+                    to: 65535
+                    value: 6
+                }
+                AppSpinBox {
+                    id: zoneValue
+                    Layout.preferredWidth: 130
+                    from: 0
+                    to: 2000000000
+                    stepSize: 1000
+                    value: 15000
+                }
+                AppButton {
+                    text: "Add rate zone"
+                    iconName: "layers"
+                    enabled: fieldMap.draftPoints.length >= 3
+                    focusPolicy: Qt.NoFocus
+                    tip: "Adds the drawn polygon as a treatment zone with this rate (raw DDOP unit) to the selected task's prescription"
+                    onClicked: {
+                        const rates = zonePanel.clientRates
+                        const ddi = rates.length > 0 && zoneRate.currentIndex >= 0 ? rates[zoneRate.currentIndex].ddi : zoneDdi.value
+                        if (bridge.addRateZone(fieldMap.draftPoints, ddi, zoneValue.value))
+                            fieldMap.clearDraft()
+                    }
+                }
+            }
+        }
+
         // drawing help
         GlassPanel {
             visible: drawSwitch.checked

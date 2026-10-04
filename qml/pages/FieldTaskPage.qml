@@ -275,6 +275,228 @@ ScrollPage {
         }
     }
 
+    // --- prescription (TC-GEO variable rate) -----------------------------------------------------
+    Card {
+        id: prescriptionCard
+        Layout.fillWidth: true
+        title: "Prescription"
+        subtitle: bridge.prescription.present ? bridge.prescription.name
+                                              : (page.taskSelected ? "No map for this task" : "Select a task first")
+        iconName: "layers"
+        actions: [
+            AppButton {
+                variant: "ghost"
+                size: "sm"
+                iconName: "upload"
+                tip: "Import ISO 11783-10 task data (TASKDATA.XML with its grid files): its tasks, prescriptions and fields"
+                onClicked: importTaskDataDialog.open()
+            },
+            AppButton {
+                variant: "ghost"
+                size: "sm"
+                iconName: "trash"
+                enabled: bridge.prescription.present === true
+                tip: "Remove the task's map"
+                onClicked: bridge.clearPrescription()
+            }
+        ]
+
+        // the rates the client can take, for the test map: "Name (DDI n)"
+        readonly property var clientRates: {
+            const rates = []
+            const seen = {}
+            for (let c = 0; c < bridge.rateChannels.length; ++c) {
+                const groups = bridge.rateChannels[c].groups
+                for (let g = 0; g < groups.length; ++g) {
+                    if (seen[groups[g].ddi]) continue
+                    seen[groups[g].ddi] = true
+                    rates.push({ "ddi": groups[g].ddi, "text": groups[g].name + " (DDI " + groups[g].ddi + ")" })
+                }
+            }
+            return rates
+        }
+
+        ColumnLayout {
+            visible: bridge.prescription.present === true
+            Layout.fillWidth: true
+            spacing: 8
+
+            Text {
+                Layout.fillWidth: true
+                text: bridge.prescription.description || ""
+                wrapMode: Text.Wrap
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSmall
+                color: Theme.textSecondary
+            }
+            FormField {
+                Layout.fillWidth: true
+                label: "Layer shown on the map"
+                AppComboBox {
+                    Layout.fillWidth: true
+                    model: (bridge.prescription.layers || []).map(function(layer) { return layer.name })
+                    currentIndex: bridge.prescription.selectedLayer !== undefined ? bridge.prescription.selectedLayer : -1
+                    onActivated: function(index) { bridge.selectPrescriptionLayer(index) }
+                }
+            }
+            // legend: the colour scale from the lowest to the highest rate of the layer
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 2
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 10
+                    radius: 3
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0.0; color: "#d7191c" }
+                        GradientStop { position: 0.25; color: "#fdae61" }
+                        GradientStop { position: 0.5; color: "#ffffbf" }
+                        GradientStop { position: 0.75; color: "#a6d96a" }
+                        GradientStop { position: 1.0; color: "#1a9641" }
+                    }
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text {
+                        text: (bridge.prescription.legendMinimum || "") + " " + (bridge.prescription.legendUnit || "")
+                        font.family: Theme.monoFamily
+                        font.pixelSize: Theme.fontCaption
+                        color: Theme.textMuted
+                    }
+                    Item { Layout.fillWidth: true }
+                    Text {
+                        text: (bridge.prescription.legendMaximum || "") + " " + (bridge.prescription.legendUnit || "")
+                        font.family: Theme.monoFamily
+                        font.pixelSize: Theme.fontCaption
+                        color: Theme.textMuted
+                    }
+                }
+            }
+        }
+
+        Divider { Layout.fillWidth: true }
+
+        SectionLabel { text: "Test map" }
+
+        FormField {
+            Layout.fillWidth: true
+            label: "Rate"
+            hint: prescriptionCard.clientRates.length === 0 ? "No client rates: enter the DDI" : ""
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                AppComboBox {
+                    id: testRate
+                    visible: prescriptionCard.clientRates.length > 0
+                    Layout.fillWidth: true
+                    model: prescriptionCard.clientRates.map(function(rate) { return rate.text })
+                }
+                AppSpinBox {
+                    id: testDdi
+                    visible: prescriptionCard.clientRates.length === 0
+                    Layout.fillWidth: true
+                    from: 1
+                    to: 65535
+                    value: 6
+                }
+            }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 12
+            FormField {
+                Layout.fillWidth: true
+                label: "Pattern"
+                AppComboBox {
+                    id: testPattern
+                    Layout.fillWidth: true
+                    model: ["Checkerboard", "Stripes (across the implement)", "Bands (along the track)", "Gradient (west to east)"]
+                }
+            }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 12
+            FormField {
+                Layout.fillWidth: true
+                label: "Rate A (raw)"
+                AppSpinBox {
+                    id: testRateA
+                    Layout.fillWidth: true
+                    from: 0
+                    to: 2000000000
+                    stepSize: 1000
+                    value: 10000
+                }
+            }
+            FormField {
+                Layout.fillWidth: true
+                label: "Rate B (raw)"
+                AppSpinBox {
+                    id: testRateB
+                    Layout.fillWidth: true
+                    from: 0
+                    to: 2000000000
+                    stepSize: 1000
+                    value: 20000
+                }
+            }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 12
+            FormField {
+                Layout.fillWidth: true
+                label: "Cell (m)"
+                AppSpinBox {
+                    id: testCell
+                    Layout.fillWidth: true
+                    from: 1
+                    to: 100
+                    value: 5
+                }
+            }
+            FormField {
+                Layout.fillWidth: true
+                label: "Pattern size (m)"
+                AppSpinBox {
+                    id: testSize
+                    Layout.fillWidth: true
+                    from: 1
+                    to: 1000
+                    value: 12
+                }
+            }
+        }
+        AppButton {
+            Layout.fillWidth: true
+            text: "Add to the task's map"
+            iconName: "plus"
+            enabled: page.taskSelected
+            onClicked: {
+                const ddi = prescriptionCard.clientRates.length > 0 && testRate.currentIndex >= 0
+                          ? prescriptionCard.clientRates[testRate.currentIndex].ddi : testDdi.value
+                bridge.createTestPrescription(ddi, testPattern.currentIndex, testRateA.value, testRateB.value,
+                                              testCell.value, testSize.value)
+            }
+        }
+        Text {
+            Layout.fillWidth: true
+            text: "A grid over the task's field, in the DDOP's raw unit of the rate. While the task runs, the TC-GEO tab sends each control channel the map's rate where its elements are."
+            wrapMode: Text.Wrap
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontCaption
+            color: Theme.textMuted
+        }
+    }
+
+    FileDialog {
+        id: importTaskDataDialog
+        title: "Import ISO 11783-10 task data"
+        nameFilters: ["ISOXML task data (TASKDATA.XML *.xml *.XML)", "All files (*)"]
+        onAccepted: bridge.importTaskData(selectedFile)
+    }
     FileDialog {
         id: saveFieldsDialog
         title: "Save fields"
